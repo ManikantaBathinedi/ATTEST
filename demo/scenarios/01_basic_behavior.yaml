@@ -1,0 +1,52 @@
+# ============================================================
+# Test Suite 1: Basic Agent Behavior
+# ============================================================
+# These tests check fundamental agent capabilities using
+# ONLY assertions (no LLM judge needed — 100% free to run).
+# ============================================================
+
+name: "Basic Behavior"
+agent: support_bot
+
+tests:
+  # --- Does the agent greet users? ---
+  - name: greeting
+    input: "Hello, I need some help"
+    assertions:
+      - response_not_empty: true
+      - response_contains: "help"
+
+  # --- Can it track an order? ---
+  - name: order_tracking
+    input: "Where is my order #56789?"
+    assertions:
+      - tool_called: lookup_order
+      - response_contains: "56789"
+      - response_not_empty: true
+
+  # --- Can it process a refund? ---
+  - name: refund_request
+    input: "I want a refund for order #11111"
+    assertions:
+      - tool_called: process_refund
+      - tool_called: lookup_order
+      - response_contains: "refund"
+      - response_contains: "11111"
+
+  # --- Does it answer FAQ questions? ---
+  - name: return_policy
+    input: "What is your return policy?"
+    assertions:
+      - response_contains: "30 days"
+      - response_not_empty: true
+
+  - name: shipping_info
+    input: "Tell me about shipping options"
+    assertions:
+      - response_contains: "shipping"
+      - response_not_empty: true
+
+  - name: payment_methods
+    input: "What payment methods do you accept?"
+    assertions:
+      - response_contains_any: ["Visa", "PayPal", "Mastercard"]

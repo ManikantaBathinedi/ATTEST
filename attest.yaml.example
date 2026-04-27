@@ -1,0 +1,147 @@
+﻿# ============================================================
+# ATTEST Configuration â€” attest.yaml
+# ============================================================
+#
+# This file tells ATTEST how to connect to your agent(s),
+# which LLM to use for evaluation, and where to find tests.
+#
+# HOW TO USE:
+#   1. Fill in your agent details below
+#   2. Put API keys in .env file (not here!)
+#   3. Run: attest test-connection   (to verify it works)
+#   4. Run: attest run               (to run your tests)
+#
+# TIPS:
+#   - Lines starting with # are comments (ignored)
+#   - Use ${ENV_VAR} to reference secrets from .env file
+#   - Uncomment examples you want to use
+#   - You can configure multiple agents and switch between them
+#
+# ============================================================
+
+
+# --- Project Info ---
+project:
+  name: "My Agent Tests"
+
+
+# ============================================================
+# AGENTS â€” Define the agent(s) you want to test
+# ============================================================
+# You can define multiple agents. Each has a name (the key)
+# and connection details. The dashboard lets you switch between them.
+#
+# Authentication goes in .env file:
+#   AZURE_API_KEY=your-key   (for Foundry agents)
+#
+# Supported types:
+#   foundry_prompt  â€” Azure AI Foundry prompt agent
+#   http            â€” Any REST API agent
+#   callable        â€” Python function (for local testing)
+# ============================================================
+
+agents:
+
+  # ----------------------------------------------------------
+  # Azure Foundry Agent
+  # ----------------------------------------------------------
+  # Find these at: https://ai.azure.com â†’ Your Project â†’ Agents
+  travel_agent:
+    type: foundry_prompt
+    endpoint: "https://your-resource.services.ai.azure.com/api/projects/your-project"
+    agent_name: "Your-Agent-Name"
+    agent_version: "1"
+
+  # ----------------------------------------------------------
+  # HTTP/REST API Agent (uncomment to use)
+  # ----------------------------------------------------------
+  # Any agent with a REST API. Configure the request/response mapping.
+  #
+  # my_http_agent:
+  #   type: http
+  #   endpoint: "http://localhost:8000"
+  #   request:
+  #     path: "/chat"                      # POST endpoint path
+  #     body_template:
+  #       message: "{{input}}"             # {{input}} = user message
+  #       session_id: "{{session_id}}"     # Optional session tracking
+  #   response:
+  #     content_path: "$.response"         # JSONPath to extract agent's reply
+  #     tool_calls_path: "$.tool_calls"    # Optional: JSONPath for tool calls
+  #   headers:
+  #     Authorization: "Bearer ${MY_API_KEY}"  # Reference from .env
+
+  # ----------------------------------------------------------
+  # Second Foundry Agent (for A/B comparison)
+  # ----------------------------------------------------------
+  # Configure multiple agents, run same tests against both,
+  # compare results in the dashboard.
+  #
+  # travel_agent_v2:
+  #   type: foundry_prompt
+  #   endpoint: "https://my-resource.services.ai.azure.com/api/projects/my-project"
+  #   agent_name: "Your-Agent-Name"
+  #   agent_version: "4"
+
+
+# ============================================================
+# EVALUATION â€” LLM Judge Configuration
+# ============================================================
+# The LLM judge scores agent responses using evaluators.
+# This is separate from the agent â€” it uses a raw model (GPT, Claude, etc.)
+# to judge the quality of your agent's responses.
+#
+# Keys go in .env:
+#   Azure OpenAI:  AZURE_API_BASE + AZURE_API_KEY_OPENAI
+#   Standard OpenAI: OPENAI_API_KEY
+#   Anthropic:     ANTHROPIC_API_KEY
+# ============================================================
+
+evaluation:
+  backend: builtin
+
+  judge:
+    # Model format: "provider/model-name"
+    # Examples:
+    #   "azure/gpt-4.1-mini"              â€” Azure OpenAI (cheapest, fast)
+    #   "azure/gpt-4o"                    â€” Azure OpenAI (best quality)
+    #   "openai/gpt-4o"                   â€” Standard OpenAI
+    #   "anthropic/claude-sonnet-4-20250514" â€” Anthropic Claude (builtin evaluators only)
+    model: "azure/gpt-4.1-mini"
+    temperature: 0.0                                    # Keep at 0 for consistent scoring
+
+  cost:
+    max_eval_cost_per_run: 5.00                        # Stop if evaluation costs exceed $5
+    cache_responses: true                               # Cache results to save money on reruns
+
+
+# ============================================================
+# TEST DISCOVERY â€” Where to find test scenarios
+# ============================================================
+
+tests:
+  scenarios_dir: "tests/scenarios"                     # Folder with your YAML test files
+  python_tests_dir: "tests"                            # Folder with Python test files
+
+
+# ============================================================
+# REPORTING â€” Where to save test results
+# ============================================================
+
+reporting:
+  output_dir: "reports"
+  formats:
+  - json                                               # Machine-readable results
+  - html                                               # Visual report (open in browser)
+  compare_with_previous: true                          # Show what changed since last run
+
+
+# ============================================================
+# DASHBOARD (optional) â€” Visual test management UI
+# ============================================================
+# Run: attest serve
+# Then open http://localhost:8080 in your browser.
+
+# dashboard:
+#   port: 8080
+#   auto_open: true

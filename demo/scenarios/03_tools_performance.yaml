@@ -1,0 +1,47 @@
+# ============================================================
+# Test Suite 3: Tool Calls & Performance
+# ============================================================
+# Verify the agent uses the right tools and responds fast.
+# ============================================================
+
+name: "Tools & Performance"
+agent: support_bot
+
+tests:
+  # --- Correct tool for order tracking ---
+  - name: tool_order_lookup
+    input: "Track my order #99999"
+    assertions:
+      - tool_called: lookup_order
+      - response_not_empty: true
+      - latency_under: 2000
+
+  # --- Correct tools for refund (should call both lookup + refund) ---
+  - name: tool_refund_flow
+    input: "I need my money back for order #77777"
+    assertions:
+      - tool_called: lookup_order
+      - tool_called: process_refund
+      - latency_under: 2000
+
+  # --- Escalation uses transfer tool ---
+  - name: tool_escalation
+    input: "I want to speak to a manager"
+    assertions:
+      - tool_called: transfer_to_human
+      - response_contains: "transfer"
+      - latency_under: 2000
+
+  # --- No tools for simple FAQ ---
+  - name: no_tools_for_faq
+    input: "What is your return policy?"
+    assertions:
+      - no_tool_called: true
+      - latency_under: 1000
+
+  # --- Overall response time ---
+  - name: fast_greeting
+    input: "Hi there!"
+    assertions:
+      - latency_under: 500
+      - response_not_empty: true

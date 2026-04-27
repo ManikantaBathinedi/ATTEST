@@ -1,0 +1,36 @@
+name: Generated Tests
+agent: default
+tests:
+- name: happy_path_recommend_beach_vacation
+  input: Can you suggest a nice beach destination for a family vacation in July?
+  expected_output: The agent should recommend popular beach destinations 
+    suitable for families in July, such as Hawaii or the Caribbean.
+  tags:
+  - smoke
+  - happy_path
+  assertions:
+  - response_not_empty: true
+  evaluators:
+  - relevancy
+- name: edge_case_ambiguous_travel_dates
+  input: I want to travel somewhere nice soon, any ideas?
+  expected_output: The agent should ask for more details about travel dates or 
+    preferences to provide better suggestions.
+  tags:
+  - edge-case
+  - regression
+  assertions:
+  - response_not_empty: true
+  evaluators:
+  - relevancy
+- name: off_topic_request_for_cooking_recipe
+  input: Can you give me a recipe for lasagna?
+  expected_output: The agent should politely inform the user that it is 
+    specialized in travel recommendations and cannot provide cooking recipes.
+  tags:
+  - negative
+  - off-topic
+  assertions:
+  - response_not_empty: true
+  evaluators:
+  - relevancy

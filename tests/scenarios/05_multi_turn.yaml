@@ -1,0 +1,63 @@
+# ============================================================
+# Test Suite 5: Multi-Turn Conversations
+# ============================================================
+# These tests send multiple messages in sequence and check
+# the agent's behavior at each step of the conversation.
+# ============================================================
+
+name: "Multi-Turn Conversations"
+agent: travel_agent
+
+tests:
+  # --- Trip planning flow ---
+  - name: trip_planning_flow
+    type: conversation
+    script:
+      - user: "I want to plan a trip to Italy"
+        expect:
+          response_not_empty: true
+          response_contains_any: ["Italy", "great", "help", "wonderful"]
+
+      - user: "I'm interested in art and history"
+        expect:
+          response_not_empty: true
+          response_contains_any: ["museum", "art", "history", "Florence", "Rome", "Vatican"]
+
+      - user: "What about food recommendations?"
+        expect:
+          response_not_empty: true
+          response_contains_any: ["pasta", "pizza", "gelato", "food", "cuisine", "Italian"]
+
+  # --- Budget conversation ---
+  - name: budget_discussion
+    type: conversation
+    script:
+      - user: "I have $1500 for a one-week vacation"
+        expect:
+          response_not_empty: true
+
+      - user: "I prefer beach destinations"
+        expect:
+          response_not_empty: true
+          response_contains_any: ["beach", "coast", "island", "sea"]
+
+      - user: "Any tips on saving money while traveling?"
+        expect:
+          response_not_empty: true
+
+  # --- Asking for clarification ---
+  - name: clarification_flow
+    type: conversation
+    script:
+      - user: "I want to go somewhere nice"
+        expect:
+          response_not_empty: true
+
+      - user: "Somewhere warm with good food"
+        expect:
+          response_not_empty: true
+
+      - user: "Also I'm traveling with two kids"
+        expect:
+          response_not_empty: true
+          response_contains_any: ["kids", "children", "family", "families"]

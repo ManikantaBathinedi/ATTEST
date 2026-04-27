@@ -1,0 +1,47 @@
+# ============================================================
+# Test Suite 1: Basic Behavior
+# ============================================================
+# Does the agent respond sensibly to common travel questions?
+# These use ONLY assertions — no LLM cost, runs instantly.
+# ============================================================
+
+name: "Basic Travel Agent Behavior"
+agent: travel_agent
+
+tests:
+  # --- Can it greet users? ---
+- name: greeting
+  input: "Hello!"
+  assertions:
+  - response_not_empty: true
+
+  # --- Can it suggest destinations? ---
+  tags:
+  - regression
+  - smoke
+- name: japan_destinations
+  input: "What are the best places to visit in Japan?"
+  assertions:
+  - response_not_empty: true
+  - response_contains_any: ["Tokyo", "Kyoto", "Osaka", "Japan"]
+
+  # --- Can it recommend food? ---
+  tags:
+  - regression
+  - smoke
+- name: italian_food
+  input: "What food should I try in Italy?"
+  assertions:
+  - response_not_empty: true
+  - response_contains_any: ["pasta", "pizza", "gelato", "Italian"]
+
+  # --- Can it help with trip planning? ---
+  tags:
+  - regression
+- name: trip_planning
+  input: "I'm planning a 5-day trip to Paris. What should I see?"
+  assertions:
+  - response_not_empty: true
+  - response_contains_any: ["Eiffel", "Louvre", "Paris", "museum"]
+
+  # --- Can it handle budget questions? ---

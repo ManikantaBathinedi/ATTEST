@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "attest"
+version = "0.1.0"
+description = "ATTEST — Agent Testing & Trust Evaluation Suite. End-to-end testing framework for AI agents, multi-agent systems, A2A, and MCP."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "AI Test Framework Team" }]
+keywords = ["ai", "agent", "testing", "evaluation", "a2a", "mcp", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
+
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.27",
+    "ruamel.yaml>=0.18",
+    "litellm>=1.50",
+    "typer>=0.12",
+    "rich>=13.0",
+    "jinja2>=3.0",
+    "jsonschema>=4.0",
+    "python-dotenv>=1.0",
+    "python-multipart>=0.0.9",
+    # Azure packages — included by default for Foundry agent support
+    "azure-ai-projects>=1.0",
+    "azure-identity>=1.19",
+    "openai>=1.0",
+]
+
+[project.optional-dependencies]
+azure = [
+    "azure-ai-evaluation>=1.14",
+    "azure-identity>=1.19",
+    "azure-ai-projects>=1.0",
+    "openai>=1.0",
+]
+deepeval = ["deepeval>=3.0"]
+ragas = ["ragas>=0.4"]
+langsmith = ["langsmith>=0.1"]
+scenario = ["langwatch-scenario>=0.7"]
+dashboard = ["fastapi>=0.115", "uvicorn>=0.30"]
+all = ["attest[azure,deepeval,ragas,langsmith,scenario,dashboard]"]
+dev = [
+    "pytest>=7",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.0",
+]
+
+[project.scripts]
+attest = "attest.cli.main:app"
+
+[project.entry-points.pytest11]
+attest = "attest.plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["attest"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true

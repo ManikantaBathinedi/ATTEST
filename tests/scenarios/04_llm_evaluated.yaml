@@ -1,0 +1,44 @@
+# ============================================================
+# Test Suite 4: LLM-Evaluated Quality
+# ============================================================
+# These tests use LLM-as-judge to evaluate response quality.
+# They cost a small amount per test (LLM API call for scoring).
+#
+# Evaluators available:
+#   correctness  — Is the answer factually correct?
+#   relevancy    — Does it address the question?
+#   hallucination — Did it make stuff up?
+#   completeness — Did it answer everything?
+#   tone         — Is the tone appropriate?
+# ============================================================
+
+name: "LLM-Evaluated Quality"
+agent: travel_agent
+
+tests:
+  # --- Correctness: check against expected answer ---
+  - name: japan_capital
+    input: "What is the capital of Japan?"
+    expected_output: "The capital of Japan is Tokyo."
+    evaluators:
+      - correctness: { threshold: 0.7 }
+
+  # --- Relevancy: is the response on-topic? ---
+  - name: travel_relevancy
+    input: "What should I pack for a trip to Iceland in winter?"
+    evaluators:
+      - relevancy: { threshold: 0.7 }
+
+  # --- Completeness: does it answer all parts? ---
+  - name: multi_part_answer
+    input: "I'm visiting Rome. What should I see, eat, and when should I go?"
+    evaluators:
+      - completeness: { threshold: 0.6 }
+      - relevancy: { threshold: 0.7 }
+
+  # --- Tone: is it friendly and helpful? ---
+  - name: friendly_tone
+    input: "I'm feeling overwhelmed planning my first solo trip. Can you help?"
+    evaluators:
+      - tone: { threshold: 0.7 }
+      - relevancy: { threshold: 0.7 }

@@ -1,0 +1,57 @@
+name: Simulation Tests
+agent: default
+tests:
+- name: sim_angry_customer
+  input: Get a full refund and return label for the damaged order.
+  type: simulation
+  persona: Angry customer whose order arrived damaged. Gets increasingly 
+    frustrated.
+  max_turns: 6
+  assertions:
+  - response_not_empty: true
+  evaluators:
+  - relevancy
+  - tone
+- name: travel agent simulation
+  input: get proper info and conversation flow as a travel agent
+  type: simulation
+  persona: a user who wants to ask details about their upcoming travel
+  max_turns: 6
+  assertions:
+  - response_not_empty: true
+  - latency_under: 15000
+  - no_tool_called: true
+  - response_is_json: true
+  evaluators:
+  - correctness
+  - relevancy
+  - hallucination
+  - completeness
+  - tone
+  - deepeval_correctness
+  - deepeval_relevancy
+  - deepeval_faithfulness
+  - deepeval_hallucination
+  - deepeval_summarization
+  - deepeval_json_correctness
+  - deepeval_bias
+  - deepeval_toxicity
+  - deepeval_contextual_relevancy
+  - deepeval_contextual_recall
+  - deepeval_contextual_precision
+  - deepeval_tool_correctness
+  - groundedness
+  - azure_relevance
+  - coherence
+  - fluency
+  - similarity
+  - task_adherence
+  - intent_resolution
+  - tool_call_accuracy
+  - response_completeness
+  - violence
+  - sexual
+  - self_harm
+  - hate_unfairness
+  - f1_score
+  - bleu_score

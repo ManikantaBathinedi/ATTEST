@@ -1,0 +1,45 @@
+# ============================================================
+# Test Suite 3: Response Quality
+# ============================================================
+# Are the responses helpful, accurate, and complete?
+# ============================================================
+
+name: "Response Quality"
+agent: travel_agent
+
+tests:
+  # --- Does it give specific recommendations? ---
+  - name: specific_not_vague
+    input: "What are the top 3 things to do in Tokyo?"
+    assertions:
+      - response_not_empty: true
+      - response_contains_any: ["Shibuya", "Shinjuku", "temple", "Akihabara", "Harajuku", "Meiji", "Senso", "Tokyo"]
+      # Should name actual places, not just say "there's lots to do"
+
+  # --- Does it mention practical info? ---
+  - name: practical_info
+    input: "When is the best time to visit Bali?"
+    assertions:
+      - response_not_empty: true
+      # Should mention months or seasons
+
+  # --- Can it handle follow-up style questions? ---
+  - name: comparison_question
+    input: "Which is better for families — Thailand or Japan?"
+    assertions:
+      - response_not_empty: true
+      - response_contains_any: ["Thailand", "Japan", "family", "families", "kids", "children"]
+
+  # --- Does it handle multi-part questions? ---
+  - name: multi_part_question
+    input: "I want to visit Spain. What cities should I see, what food should I try, and what's the best time to go?"
+    assertions:
+      - response_not_empty: true
+      - response_contains_any: ["Barcelona", "Madrid", "Spain"]
+
+  # --- Performance: does it respond within 15 seconds? ---
+  - name: response_speed
+    input: "Hi, quick question - what's a good weekend trip from London?"
+    assertions:
+      - response_not_empty: true
+      - latency_under: 15000

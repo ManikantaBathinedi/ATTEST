@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATTEST Dashboard</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#0f172a; color:#e2e8f0; }
+        .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background:#1e293b; padding:20px; border-right:1px solid #334155; overflow-y:auto; }
+        .main { margin-left:220px; padding:30px; min-height:100vh; }
+        .logo { font-size:20px; font-weight:bold; color:#f8fafc; margin-bottom:30px; }
+        .logo span { color:#3b82f6; }
+        .nav-item { display:block; padding:10px 14px; border-radius:8px; color:#94a3b8; cursor:pointer; margin-bottom:4px; font-size:14px; }
+        .nav-item:hover,.nav-item.active { background:#334155; color:#f8fafc; }
+        .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:25px; }
+        .card { background:#1e293b; border-radius:10px; padding:18px; text-align:center; }
+        .card .value { font-size:28px; font-weight:bold; }
+        .card .label { font-size:12px; color:#94a3b8; margin-top:4px; }
+        .section { background:#1e293b; border-radius:10px; padding:20px; margin-bottom:20px; }
+        .section h2 { font-size:16px; margin-bottom:15px; color:#f8fafc; }
+        .btn { padding:10px 20px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
+        .btn-primary { background:#3b82f6; color:white; }
+        .btn-primary:hover { background:#2563eb; }
+        .btn-primary:disabled { background:#475569; cursor:wait; }
+        .btn-success { background:#22c55e; color:white; }
+        .btn-danger { background:#ef4444; color:white; }
+        .btn-outline { background:transparent; border:1px solid #475569; color:#94a3b8; }
+        .btn-outline:hover { border-color:#94a3b8; color:#f8fafc; }
+        .btn-sm { padding:6px 12px; font-size:12px; }
+        input,select,textarea { background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:10px 14px; border-radius:8px; font-size:14px; width:100%; margin-bottom:12px; font-family:inherit; }
+        input:focus,select:focus,textarea:focus { outline:none; border-color:#3b82f6; }
+        label { display:block; font-size:13px; color:#94a3b8; margin-bottom:4px; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .form-group { margin-bottom:4px; }
+        table { width:100%; border-collapse:collapse; }
+        th { text-align:left; padding:10px 12px; color:#94a3b8; font-size:12px; border-bottom:1px solid #334155; }
+        td { padding:10px 12px; border-bottom:1px solid #1e293b; font-size:14px; }
+        tr:hover { background:rgba(255,255,255,0.03); }
+        .status-pass { color:#22c55e; }
+        .status-fail { color:#ef4444; }
+        .status-error { color:#eab308; }
+        .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+        .badge-pass { background:#22c55e20; color:#22c55e; }
+        .badge-fail { background:#ef444420; color:#ef4444; }
+        .page { display:none; }
+        .page.active { display:block; }
+        h1 { font-size:22px; margin-bottom:20px; }
+        .subtitle { color:#64748b; font-size:13px; margin-bottom:20px; }
+        .alert { padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+        .alert-success { background:#22c55e15; border:1px solid #22c55e40; color:#22c55e; }
+        .alert-error { background:#ef444415; border:1px solid #ef444440; color:#ef4444; }
+        .alert-info { background:#3b82f615; border:1px solid #3b82f640; color:#3b82f6; }
+        .spinner { display:inline-block; width:16px; height:16px; border:2px solid #475569; border-top-color:#3b82f6; border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .conv-trace { display:none; padding:12px; background:#0f172a; border-radius:8px; margin:8px 0; }
+        .conv-trace.show { display:block; }
+        .msg { padding:8px 12px; margin-bottom:6px; border-radius:6px; font-size:13px; line-height:1.5; }
+        .msg-user { background:#1e3a5f; }
+        .msg-agent { background:#1a2e1a; }
+        .msg-role { font-size:11px; color:#94a3b8; margin-bottom:2px; }
+        .checkbox-group { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+        .checkbox-group label { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border:1px solid #334155; border-radius:6px; font-size:13px; color:#94a3b8; }
+        .checkbox-group label:hover { border-color:#3b82f6; color:#e2e8f0; }
+        .checkbox-group input[type=checkbox] { width:auto; margin:0; }
+        .checkbox-group input[type=checkbox]:checked + span { color:#3b82f6; }
+        .tabs { display:flex; gap:4px; margin-bottom:20px; }
+        .tab { padding:8px 16px; border-radius:6px 6px 0 0; cursor:pointer; color:#94a3b8; font-size:13px; }
+        .tab.active { background:#1e293b; color:#f8fafc; }
+        .empty-state { text-align:center; padding:40px; color:#475569; }
+        .empty-state .icon { font-size:40px; margin-bottom:10px; }
+        .collapsible { border-bottom:1px solid #1e293b; user-select:none; }
+        .collapsible:hover { background:rgba(255,255,255,0.02); border-radius:4px; }
+        .collapsible .caret { font-size:8px; transition:transform 0.2s; display:inline-block; }
+        .collapsible.open .caret { transform:rotate(90deg); }
+        .section-card { background:#0f172a; border:1px solid #1e293b; border-radius:8px; padding:0; margin-bottom:8px; overflow:hidden; }
+        .section-card-header { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; user-select:none; }
+        .section-card-header:hover { background:rgba(255,255,255,0.03); }
+        .section-card-header .caret { font-size:8px; transition:transform 0.2s; display:inline-block; color:#64748b; }
+        .section-card-header.open .caret { transform:rotate(90deg); }
+        .section-card-body { padding:8px 14px 12px; border-top:1px solid #1e293b; }
+        .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; background:#3b82f620; color:#60a5fa; margin:2px; cursor:default; }
+        .tag-remove { cursor:pointer; margin-left:4px; color:#94a3b8; }
+        .tag-remove:hover { color:#ef4444; }
+        .tag-input-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:center; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:6px 10px; min-height:40px; }
+        .tag-input-wrap input { border:none; background:transparent; padding:4px; width:auto; min-width:100px; flex:1; margin:0; }
+        .tag-input-wrap input:focus { outline:none; border:none; }
+        .suite-card { background:#1e293b; border-radius:10px; padding:16px; margin-bottom:12px; border:1px solid #334155; }
+        .suite-card:hover { border-color:#3b82f6; }
+        .suite-card h3 { font-size:15px; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+        .suite-card .test-list { display:flex; flex-wrap:wrap; gap:4px; }
+        .suite-card .test-chip { font-size:11px; padding:3px 8px; background:#0f172a; border-radius:4px; color:#94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo"><span>ATTEST</span></div>
+        <a class="nav-item active" onclick="showPage('home')" id="nav-home">🏠 Dashboard</a>
+        <a class="nav-item" onclick="showPage('setup')" id="nav-setup">🔌 Agent Setup</a>
+        <a class="nav-item" onclick="showPage('tests')" id="nav-tests">📝 Test Cases</a>
+        <a class="nav-item" onclick="showPage('suites')" id="nav-suites">🏷️ Test Suites</a>
+        <a class="nav-item" onclick="showPage('run')" id="nav-run">▶️ Run Tests</a>
+        <a class="nav-item" onclick="showPage('results')" id="nav-results">📊 Results</a>
+        <a class="nav-item" onclick="showPage('settings')" id="nav-settings">⚙️ Settings</a>
+    </div>
+    <div class="main">
+
+<!-- ================= HOME ================= -->
+<div class="page active" id="page-home">
+    <h1>Dashboard</h1>
+    <div id="homeAlert"></div>
+    <div class="cards" id="summaryCards">
+        <div class="card"><div class="value" id="c-total">—</div><div class="label">Total Tests</div></div>
+        <div class="card"><div class="value status-pass" id="c-passed">—</div><div class="label">Passed</div></div>
+        <div class="card"><div class="value status-fail" id="c-failed">—</div><div class="label">Failed</div></div>
+        <div class="card"><div class="value" id="c-rate" style="color:#3b82f6">—</div><div class="label">Pass Rate</div></div>
+        <div class="card"><div class="value" id="c-duration">—</div><div class="label">Duration</div></div>
+    </div>
+    <div style="margin-bottom:20px;">
+        <button class="btn btn-primary" id="homeRunBtn" onclick="runAllTests()">▶ Run All Tests</button>
+        <span id="homeRunStatus" style="margin-left:12px;color:#94a3b8"></span>
+    </div>
+    <div class="section">
+        <h2>Latest Results</h2>
+        <table><thead><tr><th>Test</th><th>Suite</th><th>Agent</th><th>Status</th><th>Scores</th><th>Latency</th></tr></thead>
+        <tbody id="homeTableBody"></tbody></table>
+    </div>
+</div>
+
+<!-- ================= AGENT SETUP ================= -->
+<div class="page" id="page-setup">
+    <h1>Agent Connections</h1>
+    <div class="subtitle">Manage multiple AI agent connections. Add, edit, test, and remove agents.</div>
+    <div id="setupAlert"></div>
+
+    <!-- Connected Agents List -->
+    <div class="section">
+        <h2>Connected Agents</h2>
+        <div id="agentsList">Loading...</div>
+    </div>
+
+    <!-- Add/Edit Agent Form -->
+    <div class="section">
+        <h2 id="agentFormTitle">Add New Agent</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Agent Name (unique key)</label><input id="s-name" value="" placeholder="my_agent"></div>
+            <div class="form-group"><label>Agent Type</label><select id="s-type" onchange="toggleAgentFields()">
+                <option value="foundry_prompt">Azure Foundry Prompt Agent</option>
+                <option value="http">HTTP / REST API</option>
+            </select></div>
+        </div>
+        <div id="foundryFields">
+            <div class="form-group"><label>Project Endpoint</label><input id="s-endpoint" placeholder="https://your-resource.services.ai.azure.com/api/projects/your-project"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Agent Name (in Foundry)</label><input id="s-agent-name" placeholder="Travel-Agent"></div>
+                <div class="form-group"><label>Agent Version</label><input id="s-agent-version" value="latest" placeholder="3"></div>
+            </div>
+        </div>
+        <div id="httpFields" style="display:none">
+            <div class="form-group"><label>Endpoint URL</label><input id="s-http-endpoint" placeholder="http://localhost:8000"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Request Path</label><input id="s-http-path" value="/chat"></div>
+                <div class="form-group"><label>Response JSONPath</label><input id="s-http-response" value="$.response"></div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+            <button class="btn btn-primary" onclick="saveAgent()">💾 Save Agent</button>
+            <button class="btn btn-outline" onclick="testConnection()">🔌 Test Connection</button>
+            <button class="btn btn-outline" onclick="resetAgentForm()" style="color:#94a3b8">✕ Cancel</button>
+        </div>
+        <div id="connResult" style="margin-top:12px"></div>
+    </div>
+</div>
+
+<!-- ================= TEST CASES ================= -->
+<div class="page" id="page-tests">
+    <h1>Test Cases</h1>
+    <div class="subtitle">Create, edit, or upload test scenarios. Organize into suites.</div>
+    <div id="testsAlert"></div>
+    <div class="tabs">
+        <div class="tab active" onclick="showTestTab('create')">Create Test</div>
+        <div class="tab" onclick="showTestTab('upload')">Upload Data</div>
+        <div class="tab" onclick="showTestTab('list')">All Tests</div>
+    </div>
+
+    <div id="testTab-create" class="section">
+        <h2>Create a Test Case</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Test Name</label><input id="t-name" placeholder="greeting_test"></div>
+            <div class="form-group"><label>Suite</label><select id="t-suite" style="width:100%"><option value="UI Tests">UI Tests</option></select><div style="font-size:11px;color:#475569;margin-top:2px">Or type a new name: <input id="t-suite-custom" placeholder="New suite name" style="display:inline;width:200px;padding:4px 8px;font-size:11px;margin:0" onchange="if(this.value){document.getElementById('t-suite').innerHTML='<option selected>'+this.value+'</option>'+document.getElementById('t-suite').innerHTML}"></div></div>
+        </div>
+
+        <!-- Test Type Toggle -->
+        <div class="form-group" style="margin-bottom:16px">
+            <label>Test Type</label>
+            <div style="display:flex;gap:8px;margin-top:4px">
+                <button class="btn btn-sm" id="typeBtn-single" onclick="setTestType('single')" style="background:#3b82f6;color:white">Single Turn</button>
+                <button class="btn btn-outline btn-sm" id="typeBtn-multi" onclick="setTestType('multi')">Multi-Turn Conversation</button>
+                <button class="btn btn-outline btn-sm" id="typeBtn-sim" onclick="setTestType('simulation')">User Simulation</button>
+            </div>
+        </div>
+
+        <!-- Single Turn Fields -->
+        <div id="singleTurnFields">
+            <div class="form-group"><label>Input (message to send to agent)</label><textarea id="t-input" rows="3" placeholder="Hello, how can you help me?"></textarea></div>
+            <div class="form-group"><label>Expected Output (optional — for correctness eval)</label><textarea id="t-expected" rows="2" placeholder="I can help you with travel recommendations..."></textarea></div>
+            <div class="form-group"><label>Context (optional — source document text for RAG/grounding evaluation)</label><textarea id="t-context" rows="2" placeholder="Paste the source document or knowledge base text the agent should ground its answer in..."></textarea><div style="font-size:11px;color:#475569;margin-top:2px">Used by: deepeval_faithfulness, deepeval_contextual_relevancy/recall/precision, groundedness</div></div>
+        </div>
+
+        <!-- Multi-Turn Fields -->
+        <div id="multiTurnFields" style="display:none">
+            <div class="form-group">
+                <label>Conversation Steps <span style="color:#64748b;font-size:11px">(add user messages — agent responds automatically)</span></label>
+                <div id="conversationSteps">
+                    <div class="conv-step" style="display:flex;gap:8px;margin-bottom:8px;align-items:start">
+                        <span style="color:#3b82f6;font-size:12px;min-width:60px;padding-top:10px">Step 1:</span>
+                        <div style="flex:1">
+                            <textarea class="step-input" rows="2" placeholder="User message for step 1..." style="width:100%;margin-bottom:4px"></textarea>
+                            <input class="step-expect" placeholder="Expected keywords (optional) — e.g. Tokyo, Japan" style="width:100%;font-size:12px">
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <button class="btn btn-outline btn-sm" onclick="addConversationStep()">+ Add Step</button>
+                    <button class="btn btn-outline btn-sm" onclick="removeConversationStep()" style="color:#ef4444;border-color:#ef4444">- Remove Last</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simulation Fields -->
+        <div id="simulationFields" style="display:none">
+            <div style="background:#1e1b4b;border:1px solid #4338ca;border-radius:8px;padding:16px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                    <span style="font-size:18px">🎭</span>
+                    <span style="font-weight:600;color:#a5b4fc">User Simulation</span>
+                    <span style="font-size:11px;color:#818cf8">— An LLM plays a realistic user and converses with your agent</span>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label style="color:#c7d2fe">Persona</label>
+                    <textarea id="t-sim-persona" rows="2" placeholder="e.g. Frustrated customer who received a damaged laptop. Gets increasingly impatient if not helped quickly." style="background:#312e81;border-color:#4338ca;color:#e0e7ff"></textarea>
+                    <div style="font-size:11px;color:#818cf8;margin-top:2px">Describe who the simulated user is — personality, situation, emotional state</div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label style="color:#c7d2fe">Goal</label>
+                    <textarea id="t-sim-goal" rows="2" placeholder="e.g. Get a full refund and a return shipping label for the damaged laptop." style="background:#312e81;border-color:#4338ca;color:#e0e7ff"></textarea>
+                    <div style="font-size:11px;color:#818cf8;margin-top:2px">What the simulated user is trying to accomplish — the test passes if this is achieved</div>
+                </div>
+                <div class="form-group" style="margin-bottom:4px">
+                    <label style="color:#c7d2fe">Max Turns</label>
+                    <input id="t-sim-turns" type="number" value="8" min="2" max="20" style="width:80px;background:#312e81;border-color:#4338ca;color:#e0e7ff">
+                    <span style="font-size:11px;color:#818cf8;margin-left:8px">Conversation stops at this many turns (or when the goal is achieved)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assertions -->
+        <div class="form-group"><label>Assertions</label></div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#e2e8f0">Response Checks</span>
+                </label>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" checked data-assert="response_not_empty"> <span>Not Empty</span></label>
+                    <label><input type="checkbox" data-assert="response_contains"> <span>Contains:</span></label>
+                    <input id="t-contains" placeholder="word or sentence" style="width:200px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="response_contains_any"> <span>Contains Any:</span></label>
+                    <input id="t-contains-any" placeholder="Tokyo, Kyoto, Japan (comma-separated)" style="width:280px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="response_not_contains"> <span>Not Contains:</span></label>
+                    <input id="t-notcontains" placeholder="hack, password (comma = multiple)" style="width:280px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="latency_under"> <span>Latency Under (ms):</span></label>
+                    <input id="t-latency" value="15000" style="width:80px;display:inline">
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#f97316">🔧 Tool Call Assertions</span>
+                </label>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-assert="tool_called"> <span>Tool Called:</span></label>
+                    <input id="t-tool-name" placeholder="search_flights" style="width:150px;display:inline">
+                    <label><input type="checkbox" data-assert="tool_not_called"> <span>NOT Called:</span></label>
+                    <input id="t-tool-not-name" placeholder="delete_user" style="width:130px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="no_tool_called"> <span>No Tools Called</span></label>
+                    <label><input type="checkbox" data-assert="tool_called_with_args"> <span>With Args:</span></label>
+                    <input id="t-tool-args-name" placeholder="tool" style="width:80px;display:inline">
+                    <input id="t-tool-args-json" placeholder='{"dest":"Tokyo"}' style="width:160px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="tool_call_order"> <span>Call Order:</span></label>
+                    <input id="t-tool-order" placeholder="search,book,confirm" style="width:250px;display:inline">
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#22c55e">📋 Structured Output / JSON</span>
+                </label>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-assert="response_is_json"> <span>Valid JSON</span></label>
+                    <label><input type="checkbox" data-assert="exact_match"> <span>Exact Match:</span></label>
+                    <input id="t-exact-match" placeholder="exact text" style="width:180px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="json_field"> <span>Field Value:</span></label>
+                    <input id="t-jf-path" placeholder="field.path" style="width:110px;display:inline">
+                    <input id="t-jf-value" placeholder="value" style="width:130px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="json_field_exists"> <span>Fields Exist:</span></label>
+                    <input id="t-jf-exists" placeholder="name,email,age" style="width:220px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="json_field_regex"> <span>Field Regex:</span></label>
+                    <input id="t-jfr-path" placeholder="path" style="width:90px;display:inline">
+                    <input id="t-jfr-pattern" placeholder="^\d{4}-\d{2}-\d{2}$" style="width:170px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-assert="classification"> <span>Classification:</span></label>
+                    <input id="t-class-labels" placeholder="positive,negative,neutral" style="width:220px;display:inline">
+                </div>
+            </div>
+        </div>
+
+        <!-- Evaluators -->
+        <div class="form-group" style="margin-top:12px"><label>Evaluators</label></div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#e2e8f0">Built-in (5)</span>
+                </label>
+                <span style="font-size:10px;color:#475569">— uses your LLM judge</span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-eval="correctness"> <span>Correctness</span></label>
+                    <label><input type="checkbox" data-eval="relevancy"> <span>Relevancy</span></label>
+                    <label><input type="checkbox" data-eval="hallucination"> <span>Hallucination</span></label>
+                    <label><input type="checkbox" data-eval="completeness"> <span>Completeness</span></label>
+                    <label><input type="checkbox" data-eval="tone"> <span>Tone</span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#f97316">🧪 DeepEval — Quality (6)</span>
+                </label>
+                <span id="deepeval-status" style="font-size:10px;color:#475569"></span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-eval="deepeval_correctness"> <span>Correctness</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_relevancy"> <span>Relevancy</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_faithfulness"> <span>Faithfulness</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_hallucination"> <span>Hallucination</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_summarization"> <span>Summarization</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_json_correctness"> <span>JSON Correctness</span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#f97316">🧪 DeepEval — Safety, RAG, Agent (6)</span>
+                </label>
+                <span id="deepeval-status2" style="font-size:10px;color:#475569"></span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-eval="deepeval_bias"> <span>Bias</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_toxicity"> <span>Toxicity</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_contextual_relevancy"> <span>Context Relevancy</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_contextual_recall"> <span>Context Recall</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_contextual_precision"> <span>Context Precision</span></label>
+                    <label><input type="checkbox" data-eval="deepeval_tool_correctness"> <span>Tool Correctness</span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#3b82f6">☁️ Azure AI — Quality & Agent (9)</span>
+                </label>
+                <span id="azure-eval-status" style="font-size:10px;color:#475569"></span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-eval="groundedness"> <span>Groundedness</span></label>
+                    <label><input type="checkbox" data-eval="azure_relevance"> <span>Relevance</span></label>
+                    <label><input type="checkbox" data-eval="coherence"> <span>Coherence</span></label>
+                    <label><input type="checkbox" data-eval="fluency"> <span>Fluency</span></label>
+                    <label><input type="checkbox" data-eval="similarity"> <span>Similarity</span></label>
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label><input type="checkbox" data-eval="task_adherence"> <span>Task Adherence</span></label>
+                    <label><input type="checkbox" data-eval="intent_resolution"> <span>Intent Resolution</span></label>
+                    <label><input type="checkbox" data-eval="tool_call_accuracy"> <span>Tool Call Accuracy</span></label>
+                    <label><input type="checkbox" data-eval="response_completeness"> <span>Response Completeness</span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#3b82f6">☁️ Azure AI — Safety & NLP (6)</span>
+                </label>
+                <span id="azure-eval-status2" style="font-size:10px;color:#475569"></span>
+                <span style="font-size:10px;color:#475569">— free</span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" data-eval="violence"> <span>Violence</span></label>
+                    <label><input type="checkbox" data-eval="sexual"> <span>Sexual</span></label>
+                    <label><input type="checkbox" data-eval="self_harm"> <span>Self Harm</span></label>
+                    <label><input type="checkbox" data-eval="hate_unfairness"> <span>Hate/Unfairness</span></label>
+                    <label><input type="checkbox" data-eval="f1_score"> <span>F1 Score</span></label>
+                    <label><input type="checkbox" data-eval="bleu_score"> <span>BLEU Score</span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="form-group">
+            <label>Tags (press Enter or comma to add)</label>
+            <div class="tag-input-wrap" id="tagInputWrap">
+                <input id="t-tags-input" placeholder="regression, smoke, security..." onkeydown="handleTagKeydown(event)">
+            </div>
+            <div style="font-size:11px;color:#475569;margin-top:4px">Tests with the same tag form a virtual suite. One test can have multiple tags.</div>
+        </div>
+
+        <button class="btn btn-primary" onclick="createTestCase()">➕ Add Test Case</button>
+    </div>
+
+    <div id="testTab-upload" class="section" style="display:none">
+        <h2>Upload Test Cases</h2>
+        <div class="subtitle">Upload a CSV or JSONL file to bulk-create test cases. Tests are grouped by suite into YAML files.</div>
+
+        <!-- Template Downloads -->
+        <div style="background:#0f172a;border-radius:8px;padding:16px;margin-bottom:16px">
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">📥 Download a template, fill it out, then upload:</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <a href="/api/templates/csv" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📄 CSV Template (all test types)</a>
+                <a href="/api/templates/jsonl" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📋 JSONL Template (all test types)</a>
+            </div>
+        </div>
+
+        <!-- Format Guide -->
+        <div style="background:#0f172a;border-radius:8px;padding:16px;margin-bottom:16px;font-size:12px;color:#94a3b8;line-height:1.8">
+            <div style="font-weight:600;margin-bottom:6px;color:#e2e8f0">CSV Columns</div>
+            <code style="color:#60a5fa;font-size:11px">name, suite, input, expected_output, context, tags, assertions, evaluators, type, persona, max_turns</code>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+                <!-- Left: Test Types & Fields -->
+                <div>
+                    <div style="font-weight:600;color:#a5b4fc;margin-bottom:4px">Test Types (type column)</div>
+                    <div style="color:#cbd5e1"><code>single_turn</code> — single message → response (default)</div>
+                    <div style="color:#cbd5e1"><code>conversation</code> — multi-turn script (JSONL only)</div>
+                    <div style="color:#cbd5e1"><code>simulation</code> — LLM plays user persona vs agent</div>
+
+                    <div style="font-weight:600;color:#a5b4fc;margin-top:10px;margin-bottom:4px">Simulation Fields</div>
+                    <div><code>persona</code> — who the simulated user is</div>
+                    <div><code>max_turns</code> — max conversation turns (default 8)</div>
+                    <div><code>input</code> — the goal the simulated user tries to achieve</div>
+
+                    <div style="font-weight:600;color:#a5b4fc;margin-top:10px;margin-bottom:4px">RAG / Context Fields</div>
+                    <div><code>context</code> — source document text for grounding evaluation</div>
+                    <div><code>expected_output</code> — ideal answer for correctness scoring</div>
+                </div>
+
+                <!-- Right: Assertions & Evaluators -->
+                <div>
+                    <div style="font-weight:600;color:#22c55e;margin-bottom:4px">Assertions (semicolon-separated)</div>
+                    <div style="font-size:11px;line-height:1.6;color:#cbd5e1">
+                        <code>response_not_empty</code> · <code>response_contains:text</code> · <code>response_not_contains:text</code><br>
+                        <code>response_contains_any:a,b,c</code> · <code>response_matches_regex:pattern</code> · <code>exact_match:text</code><br>
+                        <code>latency_under:5000</code> · <code>token_usage_under:500</code><br>
+                        <code>tool_called:name</code> · <code>tool_not_called:name</code> · <code>no_tool_called</code><br>
+                        <code>response_is_json</code> · <code>json_field_exists:name,email</code> · <code>classification:pos,neg</code>
+                    </div>
+
+                    <div style="font-weight:600;color:#f97316;margin-top:10px;margin-bottom:4px">Evaluators (comma-separated)</div>
+                    <div style="font-size:11px;line-height:1.6;color:#cbd5e1">
+                        <b>Built-in:</b> <code>correctness</code> · <code>relevancy</code> · <code>hallucination</code> · <code>completeness</code> · <code>tone</code><br>
+                        <b>DeepEval:</b> <code>deepeval_correctness</code> · <code>deepeval_relevancy</code> · <code>deepeval_faithfulness</code> · <code>deepeval_toxicity</code> · <code>deepeval_bias</code><br>
+                        <b>Azure:</b> <code>groundedness</code> · <code>coherence</code> · <code>fluency</code> · <code>task_adherence</code> · <code>violence</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload -->
+        <div style="display:flex;gap:12px;align-items:end">
+            <div style="flex:1">
+                <label>Select File (.csv or .jsonl)</label>
+                <input type="file" id="uploadFile" accept=".csv,.jsonl,.json" style="margin:0">
+            </div>
+            <button class="btn btn-primary" onclick="uploadTestData()">📤 Upload & Create Tests</button>
+        </div>
+        <div id="uploadResult" style="margin-top:12px"></div>
+
+        <!-- Security Test Generator -->
+        <div style="background:#0f172a;border-radius:8px;padding:16px;margin-top:16px">
+            <div style="font-size:13px;color:#ef4444;margin-bottom:10px">🔴 Security / Red Team Test Generator</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:10px">Auto-generate adversarial test cases (prompt injection, jailbreak, PII extraction, etc.)</div>
+            <button class="btn btn-danger btn-sm" onclick="generateSecurityTests()">🛡️ Generate Security Tests</button>
+            <span id="securityGenResult" style="margin-left:12px;font-size:12px;color:#94a3b8"></span>
+        </div>
+
+        <!-- AI Test Generator -->
+        <div style="background:#0f172a;border-radius:8px;padding:16px;margin-top:12px">
+            <div style="font-size:13px;color:#a78bfa;margin-bottom:10px">🤖 AI Test Generator</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:10px">Describe your agent and let AI generate test cases automatically.</div>
+            <textarea id="aiGenDescription" rows="3" placeholder="Describe your agent: e.g. A travel booking agent that helps users find flights, hotels, and creates itineraries. It can look up prices and check availability." style="margin-bottom:8px"></textarea>
+            <div style="display:flex;gap:8px;align-items:center">
+                <label style="font-size:12px;color:#94a3b8;margin:0">Tests to generate:</label>
+                <input id="aiGenCount" type="number" value="5" min="1" max="20" style="width:60px;margin:0;padding:6px">
+                <button class="btn btn-primary btn-sm" onclick="generateAITests()">🤖 Generate Tests</button>
+                <span id="aiGenResult" style="font-size:12px;color:#94a3b8"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="testTab-list" class="section" style="display:none">
+        <h2>All Test Cases</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadTestCases()" style="margin-bottom:12px">🔄 Refresh</button>
+        <table><thead><tr><th>Name</th><th>Suite</th><th>Type</th><th>Input</th><th>Tags</th><th>Assertions</th><th>Evaluators</th><th></th></tr></thead>
+        <tbody id="testListBody"></tbody></table>
+    </div>
+</div>
+
+<!-- ================= TEST SUITES ================= -->
+<div class="page" id="page-suites">
+    <h1>Test Suites</h1>
+    <div class="subtitle">Create and manage test suites (YAML files) and tags. Tests can belong to one file-suite and multiple tags.</div>
+    <div id="suitesPageAlert"></div>
+
+    <!-- Create Suite -->
+    <div class="section">
+        <h2>Create New Suite</h2>
+        <div style="display:flex;gap:12px;align-items:end;">
+            <div style="flex:1">
+                <label>Suite Name</label>
+                <input id="newSuiteName2" placeholder="e.g. Performance Tests" style="margin:0">
+            </div>
+            <div style="width:180px">
+                <label>Agent</label>
+                <select id="newSuiteAgent2" style="margin:0"><option value="default">default</option></select>
+            </div>
+            <button class="btn btn-primary" onclick="createFileSuite()">📦 Create Suite</button>
+        </div>
+    </div>
+
+    <!-- File-Based Suites -->
+    <div class="section">
+        <h2>📦 File-Based Suites</h2>
+        <p style="font-size:12px;color:#64748b;margin-bottom:15px">Each suite is a YAML file in <code>tests/scenarios/</code>. Tests belong to exactly one file-suite.</p>
+        <div id="fileSuitesList2">Loading...</div>
+    </div>
+
+    <!-- Tags Section -->
+    <div class="section">
+        <h2>🏷️ Tags</h2>
+        <p style="font-size:12px;color:#64748b;margin-bottom:15px">Tags group tests across suites. One test can have many tags. Use tags for cross-cutting concerns like <em>regression</em>, <em>smoke</em>, <em>security</em>.</p>
+        <div style="display:flex;gap:12px;margin-bottom:15px;align-items:end;">
+            <div style="flex:1">
+                <label>Add Tag to Tests</label>
+                <input id="newTagName" placeholder="e.g. regression, smoke, security" style="margin:0">
+            </div>
+            <button class="btn btn-outline" onclick="openTagModal('add', document.getElementById('newTagName').value.trim().toLowerCase().replace(/\\s+/g,'-'))">🏷️ Assign to Tests</button>
+        </div>
+        <div id="tagSuitesList2"></div>
+    </div>
+
+    <!-- Tag Assignment Modal -->
+    <div id="tagAssignModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;">
+        <div style="background:#1e293b;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h2 style="font-size:16px;margin-bottom:15px;" id="tagAssignTitle">Add Tests to Suite</h2>
+            <div id="tagAssignTests" style="max-height:50vh;overflow-y:auto;margin-bottom:15px;"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn btn-outline" onclick="closeTagModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="applyTagAssignment()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= RUN TESTS ================= -->
+<div class="page" id="page-run">
+    <h1>Run Tests</h1>
+    <div class="subtitle">Select what to run and start execution.</div>
+    <div id="runAlert"></div>
+
+    <!-- Agent Override Selector -->
+    <div class="section" style="padding:14px 20px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:13px;color:#94a3b8">Run tests with agent:</span>
+            <select id="runAgentSelect" style="width:auto;margin:0;min-width:180px">
+                <option value="">Default (as configured per test)</option>
+            </select>
+            <span style="font-size:11px;color:#475569">Override the agent for all tests in this run</span>
+        </div>
+    </div>
+
+    <!-- Tag-based quick run -->
+    <div class="section" id="runTagSection" style="display:none">
+        <h2>🏷️ Run by Tag (Suite)</h2>
+        <div id="runTagButtons" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <div class="section">
+        <h2>📦 File-Based Suites</h2>
+        <div id="suitesList">Loading...</div>
+        <div style="margin-top:15px;display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="runAllTests()">▶ Run All Tests</button>
+            <span id="runPageStatus" style="color:#94a3b8;line-height:40px"></span>
+        </div>
+    </div>
+</div>
+
+<!-- ================= RESULTS ================= -->
+<div class="page" id="page-results">
+    <h1>Test Results</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <div class="subtitle" style="margin:0">Click any test to see conversation details and scores.</div>
+        <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="loadRunHistory()">📋 Run History</button>
+            <a href="/api/download/report" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📥 HTML Report</a>
+            <a href="/api/download/csv" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📊 Export CSV</a>
+            <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div id="resultsRunBanner"></div>
+    <div style="display:flex;gap:12px;margin-bottom:15px;align-items:center">
+        <span style="font-size:13px;color:#94a3b8">Filter:</span>
+        <select id="resultsAgentFilter" onchange="applyResultsFilter()" style="width:auto;margin:0;min-width:150px">
+            <option value="">All Agents</option>
+        </select>
+        <select id="resultsStatusFilter" onchange="applyResultsFilter()" style="width:auto;margin:0;min-width:120px">
+            <option value="">All Statuses</option>
+            <option value="passed">✅ Passed</option>
+            <option value="failed">❌ Failed</option>
+            <option value="error">⚠️ Error</option>
+        </select>
+        <span id="resultsCount" style="font-size:12px;color:#64748b;margin-left:auto"></span>
+    </div>
+
+    <!-- Run selector -->
+    <div id="runHistoryPanel" style="display:none;margin-bottom:15px">
+        <div class="section" style="padding:12px">
+            <h2 style="font-size:14px;margin-bottom:10px">Run History</h2>
+            <div id="runHistoryList">Loading...</div>
+        </div>
+    </div>
+
+    <table><thead><tr><th>Test</th><th>Suite</th><th>Agent</th><th>Status</th><th>Scores</th><th>Assertions</th><th>Latency</th></tr></thead>
+    <tbody id="resultsTableBody"></tbody></table>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="page" id="page-settings">
+    <h1>Settings</h1>
+    <div id="settingsKeyStatus" style="margin-bottom:16px"></div>
+    <div class="section">
+        <h2>API Keys</h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">These keys are saved to <code>.env</code> file and used for agent authentication and LLM evaluation.</div>
+        <div class="form-group">
+            <label>Azure API Key <span style="color:#64748b;font-size:11px">(used for Foundry agent connection + Azure evaluators)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input id="set-azure-key" type="password" placeholder="Paste your Azure API key here" style="flex:1;margin:0">
+                <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-azure-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>OpenAI API Key <span style="color:#64748b;font-size:11px">(only needed if NOT using Azure for LLM evaluation)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input id="set-openai-key" type="password" placeholder="sk-... (optional — skip if using Azure)" style="flex:1;margin:0">
+                <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-openai-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">💾 Save Keys</button>
+        <div id="settingsAlert" style="margin-top:12px"></div>
+    </div>
+    <div class="section">
+        <h2>Current Configuration</h2>
+        <div id="configDisplay">Loading...</div>
+    </div>
+</div>
+
+    </div>
+
+<script>
+// ===== Navigation =====
+function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-'+name).classList.add('active');
+    document.getElementById('nav-'+name).classList.add('active');
+    if (name==='results') loadResults();
+    if (name==='tests') { loadTestCases(); checkEvaluatorStatus(); }
+    if (name==='run') loadSuites();
+    if (name==='suites') loadSuitesPage();
+    if (name==='settings') loadConfigDisplay();
+    if (name==='setup') loadAgentSetup();
+}
+
+function showTestTab(name) {
+    document.querySelectorAll('[id^=testTab-]').forEach(t => t.style.display='none');
+    document.getElementById('testTab-'+name).style.display='block';
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    if (name==='list') loadTestCases();
+}
+
+// ===== Agent Setup =====
+async function loadAgentSetup() {
+    try {
+        const res = await fetch('/api/agents/current');
+        const data = await res.json();
+        const el = document.getElementById('agentsList');
+        const agents = data.agents || [];
+
+        if (agents.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:20px;color:#475569">No agents configured yet. Add one below.</div>';
+        } else {
+            el.innerHTML = agents.map(a => {
+                const typeBadge = a.type === 'foundry_prompt'
+                    ? '<span style="background:#3b82f620;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Foundry</span>'
+                    : '<span style="background:#22c55e20;color:#22c55e;padding:2px 8px;border-radius:4px;font-size:11px">HTTP</span>';
+                const endpoint = a.endpoint ? (a.endpoint.length > 60 ? a.endpoint.substring(0,60)+'...' : a.endpoint) : '—';
+                const detail = a.type === 'foundry_prompt'
+                    ? `Agent: ${a.agent_name || '—'} v${a.agent_version || 'latest'}`
+                    : `Path: ${a.request_path || '/chat'}`;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #334155">
+                    <div>
+                        <div style="font-weight:600;font-size:14px">${a.name} ${typeBadge}</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px">${endpoint}</div>
+                        <div style="font-size:11px;color:#475569">${detail}</div>
+                    </div>
+                    <div style="display:flex;gap:6px">
+                        <button class="btn btn-outline btn-sm" onclick="editAgent('${a.name}')">✏️ Edit</button>
+                        <button class="btn btn-outline btn-sm" onclick="testAgentByName('${a.name}')">🔌 Test</button>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="deleteAgent('${a.name}')">🗑️</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    } catch(e) { console.error('Failed to load agent config:', e); }
+}
+
+function resetAgentForm() {
+    document.getElementById('s-name').value = '';
+    document.getElementById('s-type').value = 'foundry_prompt';
+    toggleAgentFields();
+    document.getElementById('s-endpoint').value = '';
+    document.getElementById('s-agent-name').value = '';
+    document.getElementById('s-agent-version').value = 'latest';
+    document.getElementById('s-http-endpoint').value = '';
+    document.getElementById('s-http-path').value = '/chat';
+    document.getElementById('s-http-response').value = '$.response';
+    document.getElementById('connResult').innerHTML = '';
+    document.getElementById('agentFormTitle').textContent = 'Add New Agent';
+}
+
+async function editAgent(name) {
+    try {
+        const res = await fetch('/api/agents/current');
+        const data = await res.json();
+        const agent = (data.agents || []).find(a => a.name === name);
+        if (!agent) return;
+
+        document.getElementById('s-name').value = agent.name;
+        document.getElementById('s-type').value = agent.type || 'foundry_prompt';
+        toggleAgentFields();
+
+        if (agent.type === 'foundry_prompt') {
+            document.getElementById('s-endpoint').value = agent.endpoint || '';
+            document.getElementById('s-agent-name').value = agent.agent_name || '';
+            document.getElementById('s-agent-version').value = agent.agent_version || '';
+        } else {
+            document.getElementById('s-http-endpoint').value = agent.endpoint || '';
+            document.getElementById('s-http-path').value = agent.request_path || '/chat';
+            document.getElementById('s-http-response').value = agent.response_path || '$.response';
+        }
+        document.getElementById('agentFormTitle').textContent = 'Edit Agent: ' + name;
+        document.getElementById('connResult').innerHTML = '';
+    } catch(e) {}
+}
+
+async function deleteAgent(name) {
+    if (!confirm('Delete agent "' + name + '"?')) return;
+    try {
+        const res = await fetch('/api/agents/' + encodeURIComponent(name), {method:'DELETE'});
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('setupAlert').innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+            setTimeout(() => { document.getElementById('setupAlert').innerHTML = ''; }, 3000);
+            loadAgentSetup();
+        } else {
+            document.getElementById('setupAlert').innerHTML = '<div class="alert alert-error">' + data.error + '</div>';
+        }
+    } catch(e) {}
+}
+
+async function testAgentByName(name) {
+    try {
+        const res = await fetch('/api/agents/current');
+        const data = await res.json();
+        const agent = (data.agents || []).find(a => a.name === name);
+        if (!agent) return;
+        document.getElementById('setupAlert').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Testing ' + name + '...</div>';
+        const testRes = await fetch('/api/agents/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(agent)});
+        const result = await testRes.json();
+        if (result.connected) {
+            document.getElementById('setupAlert').innerHTML = '<div class="alert alert-success">✅ ' + name + ' connected! (' + result.latency_ms + 'ms) — ' + (result.response_preview||'').substring(0,100) + '</div>';
+        } else {
+            document.getElementById('setupAlert').innerHTML = '<div class="alert alert-error">❌ ' + name + ' failed: ' + result.error + '</div>';
+        }
+    } catch(e) { document.getElementById('setupAlert').innerHTML = '<div class="alert alert-error">' + e.message + '</div>'; }
+}
+
+// ===== Collapsible Sections =====
+function toggleSection(el) {
+    el.classList.toggle('open');
+    const body = el.nextElementSibling;
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleCard(header) {
+    header.classList.toggle('open');
+    const body = header.nextElementSibling;
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleAllInCard(selectAllCb, type) {
+    const card = selectAllCb.closest('.section-card');
+    const body = card.querySelector('.section-card-body');
+    const checkboxes = body.querySelectorAll('input[type=checkbox][data-' + type + ']');
+    checkboxes.forEach(cb => { cb.checked = selectAllCb.checked; });
+    // Also expand if selecting all
+    if (selectAllCb.checked) {
+        const header = card.querySelector('.section-card-header');
+        if (!header.classList.contains('open')) {
+            header.classList.add('open');
+            body.style.display = 'block';
+        }
+    }
+}
+
+function selectAllInSection(btn, type) {
+    const body = btn.closest('.collapsible').nextElementSibling;
+    const checkboxes = body.querySelectorAll('input[type=checkbox][data-' + type + ']');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => { cb.checked = !allChecked; });
+}
+
+function toggleAgentFields() {
+    const type = document.getElementById('s-type').value;
+    document.getElementById('foundryFields').style.display = type==='foundry_prompt' ? 'block' : 'none';
+    document.getElementById('httpFields').style.display = type==='http' ? 'block' : 'none';
+}
+
+async function testConnection() {
+    const el = document.getElementById('connResult');
+    el.innerHTML = '<span class="spinner"></span> Testing connection...';
+    const type = document.getElementById('s-type').value;
+    const body = {
+        name: document.getElementById('s-name').value,
+        type,
+    };
+    if (type==='foundry_prompt') {
+        body.endpoint = document.getElementById('s-endpoint').value;
+        body.agent_name = document.getElementById('s-agent-name').value;
+        body.agent_version = document.getElementById('s-agent-version').value;
+    } else {
+        body.endpoint = document.getElementById('s-http-endpoint').value;
+        body.request_path = document.getElementById('s-http-path').value;
+        body.response_path = document.getElementById('s-http-response').value;
+    }
+    try {
+        const res = await fetch('/api/agents/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        const data = await res.json();
+        if (data.connected) {
+            el.innerHTML = `<div class="alert alert-success">✅ Connected! (${data.latency_ms}ms)<br>Response: ${data.response_preview}</div>`;
+        } else {
+            el.innerHTML = `<div class="alert alert-error">❌ Failed: ${data.error}</div>`;
+        }
+    } catch(e) { el.innerHTML = `<div class="alert alert-error">Error: ${e.message}</div>`; }
+}
+
+async function saveAgent() {
+    const name = document.getElementById('s-name').value.trim();
+    if (!name) { document.getElementById('setupAlert').innerHTML = '<div class="alert alert-error">Agent name is required.</div>'; return; }
+    const type = document.getElementById('s-type').value;
+    const body = { name, type };
+    if (type==='foundry_prompt') {
+        body.endpoint = document.getElementById('s-endpoint').value;
+        body.agent_name = document.getElementById('s-agent-name').value;
+        body.agent_version = document.getElementById('s-agent-version').value;
+    } else {
+        body.endpoint = document.getElementById('s-http-endpoint').value;
+        body.request_path = document.getElementById('s-http-path').value;
+        body.response_path = document.getElementById('s-http-response').value;
+    }
+    try {
+        const res = await fetch('/api/agents', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        const data = await res.json();
+        document.getElementById('setupAlert').innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        setTimeout(() => { document.getElementById('setupAlert').innerHTML = ''; }, 3000);
+        resetAgentForm();
+        loadAgentSetup();
+    } catch(e) { document.getElementById('setupAlert').innerHTML = `<div class="alert alert-error">Error: ${e.message}</div>`; }
+}
+
+// ===== Test Cases =====
+// ===== Multi-turn form helpers =====
+let _testType = 'single';
+let _stepCount = 1;
+
+function setTestType(type) {
+    _testType = type;
+    document.getElementById('singleTurnFields').style.display = type==='single' ? 'block' : 'none';
+    document.getElementById('multiTurnFields').style.display = type==='multi' ? 'block' : 'none';
+    document.getElementById('simulationFields').style.display = type==='simulation' ? 'block' : 'none';
+    // Update button styles
+    ['single','multi','sim'].forEach(t => {
+        const btn = document.getElementById('typeBtn-' + t);
+        const isActive = (t === type) || (t === 'sim' && type === 'simulation');
+        btn.className = isActive ? 'btn btn-sm' : 'btn btn-outline btn-sm';
+        btn.style.background = isActive ? '#3b82f6' : '';
+        btn.style.color = isActive ? 'white' : '';
+    });
+}
+
+async function checkEvaluatorStatus() {
+    try {
+        const res = await fetch('/api/evaluators/status');
+        const data = await res.json();
+
+        // DeepEval status
+        const deLabel = data.deepeval.installed
+            ? (data.deepeval.configured ? '✅ ready' : '⚠️ needs OPENAI_API_KEY or Azure keys')
+            : '❌ not installed — pip install deepeval';
+        const deColor = data.deepeval.configured ? '#22c55e' : data.deepeval.installed ? '#eab308' : '#ef4444';
+        const deHtml = `<span style="color:${deColor}">${deLabel}</span>`;
+        const s1 = document.getElementById('deepeval-status');
+        const s2 = document.getElementById('deepeval-status2');
+        if (s1) s1.innerHTML = deHtml;
+        if (s2) s2.innerHTML = deHtml;
+
+        // Azure eval status
+        const azLabel = data.azure_eval.installed
+            ? '✅ ready'
+            : '❌ not installed — pip install azure-ai-evaluation';
+        const azColor = data.azure_eval.installed ? '#22c55e' : '#ef4444';
+        const azHtml = `<span style="color:${azColor}">${azLabel}</span>`;
+        const a1 = document.getElementById('azure-eval-status');
+        const a2 = document.getElementById('azure-eval-status2');
+        if (a1) a1.innerHTML = azHtml;
+        if (a2) a2.innerHTML = azHtml;
+    } catch(e) {}
+}
+
+function addConversationStep() {
+    _stepCount++;
+    const container = document.getElementById('conversationSteps');
+    const step = document.createElement('div');
+    step.className = 'conv-step';
+    step.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:start';
+    step.innerHTML = `
+        <span style="color:#3b82f6;font-size:12px;min-width:60px;padding-top:10px">Step ${_stepCount}:</span>
+        <div style="flex:1">
+            <textarea class="step-input" rows="2" placeholder="User message for step ${_stepCount}..." style="width:100%;margin-bottom:4px"></textarea>
+            <input class="step-expect" placeholder="Expected keywords (optional) — e.g. museum, art" style="width:100%;font-size:12px">
+        </div>`;
+    container.appendChild(step);
+}
+
+function removeConversationStep() {
+    const container = document.getElementById('conversationSteps');
+    if (container.children.length > 1) {
+        container.removeChild(container.lastChild);
+        _stepCount--;
+    }
+}
+
+function getConversationScript() {
+    const steps = [];
+    document.querySelectorAll('.conv-step').forEach(step => {
+        const input = step.querySelector('.step-input').value.trim();
+        const expectKeywords = step.querySelector('.step-expect').value.trim();
+        if (!input) return;
+
+        const entry = { user: input, expect: { response_not_empty: true } };
+        if (expectKeywords) {
+            const keywords = expectKeywords.split(',').map(k => k.trim()).filter(k => k);
+            if (keywords.length > 0) {
+                entry.expect.response_contains_any = keywords;
+            }
+        }
+        steps.push(entry);
+    });
+    return steps;
+}
+
+// ===== Tag Input Handler =====
+function handleTagKeydown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const input = e.target;
+        const tag = input.value.replace(/,/g,'').trim().toLowerCase().replace(/\s+/g, '-');
+        if (!tag) return;
+        // Check for duplicate
+        const existing = Array.from(document.querySelectorAll('#tagInputWrap .tag')).map(el => el.dataset.tag);
+        if (existing.includes(tag)) { input.value = ''; return; }
+        // Create tag element
+        const span = document.createElement('span');
+        span.className = 'tag';
+        span.dataset.tag = tag;
+        span.innerHTML = `${tag}<span class="tag-remove" onclick="this.parentElement.remove()">×</span>`;
+        input.parentNode.insertBefore(span, input);
+        input.value = '';
+    }
+}
+
+// ===== Create Test Case =====
+async function createTestCase() {
+    const assertions = [];
+    document.querySelectorAll('[data-assert]').forEach(cb => {
+        if (!cb.checked) return;
+        const type = cb.dataset.assert;
+        if (type==='response_not_empty') assertions.push({response_not_empty:true});
+        if (type==='response_contains') { const v=document.getElementById('t-contains').value.trim(); if(v) assertions.push({response_contains:v}); }
+        if (type==='response_contains_any') {
+            const v=document.getElementById('t-contains-any').value.trim();
+            if(v) assertions.push({response_contains_any:v.split(',').map(s=>s.trim()).filter(Boolean)});
+        }
+        if (type==='response_not_contains') {
+            const v=document.getElementById('t-notcontains').value.trim();
+            if(v) {
+                // Support comma-separated: each becomes a separate assertion
+                const words = v.split(',').map(s=>s.trim()).filter(Boolean);
+                for (const w of words) assertions.push({response_not_contains:w});
+            }
+        }
+        if (type==='latency_under') { const v=document.getElementById('t-latency').value; if(v) assertions.push({latency_under:parseInt(v)}); }
+        // Tool call assertions
+        if (type==='tool_called') { const v=document.getElementById('t-tool-name').value.trim(); if(v) assertions.push({tool_called:v}); }
+        if (type==='tool_not_called') { const v=document.getElementById('t-tool-not-name').value.trim(); if(v) assertions.push({tool_not_called:v}); }
+        if (type==='no_tool_called') assertions.push({no_tool_called:true});
+        if (type==='tool_called_with_args') {
+            const name=document.getElementById('t-tool-args-name').value.trim();
+            const argsStr=document.getElementById('t-tool-args-json').value.trim();
+            if(name && argsStr) { try { assertions.push({tool_called_with_args:{name,args:JSON.parse(argsStr)}}); } catch(e) { alert('Invalid JSON in tool args'); return; } }
+        }
+        if (type==='tool_call_order') {
+            const v=document.getElementById('t-tool-order').value.trim();
+            if(v) assertions.push({tool_call_order:v.split(',').map(s=>s.trim()).filter(Boolean)});
+        }
+        // Structured output assertions
+        if (type==='response_is_json') assertions.push({response_is_json:true});
+        if (type==='exact_match') { const v=document.getElementById('t-exact-match').value; if(v) assertions.push({exact_match:v}); }
+        if (type==='json_field') {
+            const p=document.getElementById('t-jf-path').value.trim();
+            let val=document.getElementById('t-jf-value').value.trim();
+            if(p && val) { try { val=JSON.parse(val); } catch(e) {} assertions.push({json_field:{path:p,value:val}}); }
+        }
+        if (type==='json_field_exists') {
+            const v=document.getElementById('t-jf-exists').value.trim();
+            if(v) assertions.push({json_field_exists:v.split(',').map(s=>s.trim()).filter(Boolean)});
+        }
+        if (type==='json_field_regex') {
+            const p=document.getElementById('t-jfr-path').value.trim();
+            const pat=document.getElementById('t-jfr-pattern').value.trim();
+            if(p && pat) assertions.push({json_field_regex:{path:p,pattern:pat}});
+        }
+        if (type==='classification') {
+            const v=document.getElementById('t-class-labels').value.trim();
+            if(v) assertions.push({classification:v.split(',').map(s=>s.trim()).filter(Boolean)});
+        }
+    });
+    const evaluators = [];
+    document.querySelectorAll('[data-eval]').forEach(cb => { if(cb.checked) evaluators.push(cb.dataset.eval); });
+
+    // Collect tags
+    const tags = Array.from(document.querySelectorAll('#tagInputWrap .tag')).map(el => el.dataset.tag).filter(Boolean);
+
+    const body = {
+        name: document.getElementById('t-name').value || 'test_' + Date.now(),
+        suite: document.getElementById('t-suite').value,
+        assertions, evaluators, tags, agent: 'default',
+        type: _testType === 'multi' ? 'conversation' : (_testType === 'simulation' ? 'simulation' : 'single_turn'),
+    };
+
+    if (_testType === 'simulation') {
+        const persona = document.getElementById('t-sim-persona').value.trim();
+        const goal = document.getElementById('t-sim-goal').value.trim();
+        const maxTurns = parseInt(document.getElementById('t-sim-turns').value) || 8;
+        if (!persona) {
+            document.getElementById('testsAlert').innerHTML = '<div class="alert alert-error">Persona is required for simulation tests.</div>';
+            return;
+        }
+        if (!goal) {
+            document.getElementById('testsAlert').innerHTML = '<div class="alert alert-error">Goal is required for simulation tests.</div>';
+            return;
+        }
+        body.persona = persona;
+        body.input = goal;
+        body.max_turns = maxTurns;
+    } else if (_testType === 'multi') {
+        body.conversation_script = getConversationScript();
+        body.input = body.conversation_script.length > 0 ? body.conversation_script[0].user : '';
+        if (body.conversation_script.length === 0) {
+            document.getElementById('testsAlert').innerHTML = '<div class="alert alert-error">Add at least one conversation step.</div>';
+            return;
+        }
+    } else {
+        body.input = document.getElementById('t-input').value;
+        body.expected_output = document.getElementById('t-expected').value || null;
+    }
+
+    // Context for RAG evaluators
+    const ctx = document.getElementById('t-context').value.trim();
+    if (ctx) body.context = ctx;
+
+    if (!body.input && _testType !== 'multi') {
+        document.getElementById('testsAlert').innerHTML = '<div class="alert alert-error">Input message is required.</div>';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/testcases', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        const data = await res.json();
+        document.getElementById('testsAlert').innerHTML = `<div class="alert alert-success">✅ ${data.message}</div>`;
+        // Reset form
+        document.getElementById('t-name').value = '';
+        document.getElementById('t-input').value = '';
+        document.getElementById('t-expected').value = '';
+        document.getElementById('t-context').value = '';
+        // Reset tags
+        document.querySelectorAll('#tagInputWrap .tag').forEach(el => el.remove());
+        // Reset multi-turn steps
+        document.getElementById('conversationSteps').innerHTML = `
+            <div class="conv-step" style="display:flex;gap:8px;margin-bottom:8px;align-items:start">
+                <span style="color:#3b82f6;font-size:12px;min-width:60px;padding-top:10px">Step 1:</span>
+                <div style="flex:1">
+                    <textarea class="step-input" rows="2" placeholder="User message for step 1..." style="width:100%;margin-bottom:4px"></textarea>
+                    <input class="step-expect" placeholder="Expected keywords (optional)" style="width:100%;font-size:12px">
+                </div>
+            </div>`;
+        _stepCount = 1;
+        // Reset simulation fields
+        document.getElementById('t-sim-persona').value = '';
+        document.getElementById('t-sim-goal').value = '';
+        document.getElementById('t-sim-turns').value = '8';
+    } catch(e) { document.getElementById('testsAlert').innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function uploadTestData() {
+    const file = document.getElementById('uploadFile').files[0];
+    if (!file) { document.getElementById('uploadResult').innerHTML = '<div class="alert alert-error">Select a file first.</div>'; return; }
+    const form = new FormData();
+    form.append('file', file);
+    document.getElementById('uploadResult').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Processing file...</div>';
+    try {
+        const res = await fetch('/api/testcases/upload', {method:'POST', body:form});
+        const data = await res.json();
+        if (res.ok) {
+            let html = `<div class="alert alert-success">✅ ${data.message}</div>`;
+            if (data.suites && data.suites.length) {
+                html += '<div style="margin-top:8px;font-size:12px;color:#94a3b8">';
+                html += '<strong>Suites created/updated:</strong> ' + data.suites.join(', ') + '<br>';
+                html += '<strong>Files:</strong> ' + (data.files||[]).join(', ');
+                html += '</div>';
+            }
+            document.getElementById('uploadResult').innerHTML = html;
+            // Refresh test list
+            loadTestCases();
+        } else {
+            document.getElementById('uploadResult').innerHTML = `<div class="alert alert-error">❌ ${data.error}</div>`;
+        }
+    } catch(e) { document.getElementById('uploadResult').innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function generateSecurityTests() {
+    const el = document.getElementById('securityGenResult');
+    el.innerHTML = '<span class="spinner"></span> Generating...';
+    try {
+        const res = await fetch('/api/testcases/generate-security', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        const data = await res.json();
+        el.innerHTML = '✅ ' + data.message + ' → ' + data.file;
+        loadTestCases();
+    } catch(e) { el.innerHTML = '❌ ' + e.message; }
+}
+
+async function generateAITests() {
+    const desc = document.getElementById('aiGenDescription').value.trim();
+    if (!desc) { document.getElementById('aiGenResult').innerHTML = '❌ Describe your agent first'; return; }
+    const count = parseInt(document.getElementById('aiGenCount').value) || 5;
+    const el = document.getElementById('aiGenResult');
+    el.innerHTML = '<span class="spinner"></span> Generating with AI...';
+    try {
+        const res = await fetch('/api/testcases/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({description:desc, count})});
+        const data = await res.json();
+        if (res.ok) {
+            el.innerHTML = '✅ ' + data.message + ' → ' + data.file;
+            loadTestCases();
+        } else {
+            el.innerHTML = '❌ ' + (data.error || 'Failed');
+        }
+    } catch(e) { el.innerHTML = '❌ ' + e.message; }
+}
+
+async function loadTestCases() {
+    try {
+        const res = await fetch('/api/testcases');
+        const data = await res.json();
+        const body = document.getElementById('testListBody');
+        if (!data.test_cases || data.test_cases.length===0) {
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#475569;padding:30px">No test cases yet. Create one above!</td></tr>';
+            return;
+        }
+        // Store full data for editing
+        _allTestCases = data.test_cases;
+
+        // Populate suite dropdown from all YAML files (includes empty suites)
+        try {
+            const sres = await fetch('/api/suites');
+            const sdata = await sres.json();
+            const suiteSelect = document.getElementById('t-suite');
+            const currentVal = suiteSelect.value;
+            const allSuites = (sdata.file_suites || []).map(s => s.name);
+            suiteSelect.innerHTML = allSuites.map(s => `<option value="${s}" ${s===currentVal?'selected':''}>${s}</option>`).join('');
+        } catch(e) {}
+
+        body.innerHTML = data.test_cases.map((tc, idx) => {
+            const typeLabel = tc.type === 'conversation'
+                ? `<span style="color:#3b82f6">${tc.type} (${tc.conversation_script?.length || 0} steps)</span>`
+                : tc.type === 'simulation'
+                ? `<span style="color:#a78bfa">🎭 simulation (${tc.max_turns || 8} turns)</span>`
+                : tc.type;
+            const tagsHtml = (tc.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+            return `<tr>
+                <td><strong>${tc.name}</strong></td>
+                <td>${tc.suite}</td>
+                <td>${typeLabel}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tc.input}</td>
+                <td>${tagsHtml || '<span style="color:#475569;font-size:11px">—</span>'}</td>
+                <td>${tc.assertions}</td>
+                <td>${tc.evaluators}</td>
+                <td>
+                    <button class="btn btn-outline btn-sm" onclick="editTestCase(${idx})">✏️</button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) {}
+}
+
+// Store test cases data for editing
+let _allTestCases = [];
+
+// Edit test: populate the Create form with existing values
+function editTestCase(index) {
+    const tc = _allTestCases[index];
+    if (!tc) return;
+
+    showTestTab('create');
+    document.getElementById('t-name').value = tc.name;
+    document.getElementById('t-suite').value = tc.suite;
+
+    if (tc.type === 'conversation' && tc.conversation_script && tc.conversation_script.length > 0) {
+        // Switch to multi-turn mode
+        setTestType('multi');
+
+        // Populate conversation steps
+        const container = document.getElementById('conversationSteps');
+        container.innerHTML = '';
+        _stepCount = 0;
+
+        tc.conversation_script.forEach((step, i) => {
+            _stepCount = i + 1;
+            const userMsg = step.user || '';
+            const expects = step.expect || {};
+            const keywords = expects.response_contains_any ? expects.response_contains_any.join(', ') : '';
+
+            const div = document.createElement('div');
+            div.className = 'conv-step';
+            div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:start';
+            div.innerHTML = `
+                <span style="color:#3b82f6;font-size:12px;min-width:60px;padding-top:10px">Step ${_stepCount}:</span>
+                <div style="flex:1">
+                    <textarea class="step-input" rows="2" style="width:100%;margin-bottom:4px">${userMsg}</textarea>
+                    <input class="step-expect" value="${keywords}" placeholder="Expected keywords (optional)" style="width:100%;font-size:12px">
+                </div>`;
+            container.appendChild(div);
+        });
+    } else if (tc.type === 'simulation') {
+        setTestType('simulation');
+        document.getElementById('t-sim-persona').value = tc.persona || '';
+        document.getElementById('t-sim-goal').value = tc.full_input || tc.input || '';
+        document.getElementById('t-sim-turns').value = tc.max_turns || 8;
+    } else {
+        // Single turn mode
+        setTestType('single');
+        document.getElementById('t-input').value = tc.full_input || tc.input;
+        document.getElementById('t-expected').value = tc.expected_output || '';
+    }
+
+    // Set evaluator checkboxes
+    document.querySelectorAll('[data-eval]').forEach(cb => { cb.checked = false; });
+    if (tc.evaluator_list) {
+        tc.evaluator_list.forEach(ev => {
+            const name = typeof ev === 'string' ? ev : Object.keys(ev)[0];
+            const cb = document.querySelector(`[data-eval="${name}"]`);
+            if (cb) cb.checked = true;
+        });
+    }
+
+    document.getElementById('testsAlert').innerHTML = '<div class="alert alert-info">Editing: <strong>' + tc.name + '</strong>. Modify and click "Add Test Case" to save.</div>';
+}
+
+// ===== Test Suites Page (unified) =====
+function suiteAlert(msg, type='success') {
+    const el = document.getElementById('suitesPageAlert');
+    el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+    if (type !== 'error') setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+
+async function loadSuitesPage() {
+    try {
+        const res = await fetch('/api/suites');
+        const data = await res.json();
+
+        // Populate agent dropdown
+        const agentSelect = document.getElementById('newSuiteAgent2');
+        agentSelect.innerHTML = '<option value="default">default</option>';
+        (data.agents || []).forEach(a => {
+            if (a !== 'default') agentSelect.innerHTML += `<option value="${a}">${a}</option>`;
+        });
+
+        // ---- File-Based Suites ----
+        const fileEl = document.getElementById('fileSuitesList2');
+        const fileSuites = data.file_suites || [];
+        const allSuiteNames = fileSuites.map(s => s.name);
+
+        if (fileSuites.length === 0) {
+            fileEl.innerHTML = '<div style="text-align:center;padding:20px;color:#475569">No suites yet. Create one above.</div>';
+        } else {
+            fileEl.innerHTML = fileSuites.map(s => {
+                const moveOpts = allSuiteNames.filter(n => n !== s.name).map(n => `<option value="${escH(n)}">${escH(n)}</option>`).join('');
+                const fileId = 'fsuite-' + s.name.replace(/[^a-z0-9]/gi,'');
+                const testsHtml = s.tests.length > 0
+                    ? s.tests.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1e293b">
+                        <span style="font-size:13px">${escH(t)}</span>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <button class="btn btn-outline btn-sm" onclick="runSingleTestFromSuite('${escH(t)}')" title="Run this test">▶</button>
+                            <span style="font-size:11px;color:#475569">Move to:</span>
+                            <select onchange="moveTest('${escH(t)}','${escH(s.name)}',this.value);this.selectedIndex=0" style="font-size:11px;padding:2px 6px;width:auto;margin:0;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:4px">
+                                <option value="">Select...</option>
+                                ${moveOpts}
+                            </select>
+                        </div>
+                    </div>`).join('')
+                    : '<div style="color:#475569;font-size:12px;padding:10px 0">Empty suite — create tests from the Test Cases page and select this suite.</div>';
+
+                return `<div class="suite-card">
+                    <h3 style="cursor:pointer" onclick="document.getElementById('${fileId}').style.display=document.getElementById('${fileId}').style.display==='none'?'block':'none'">
+                        <span style="font-size:18px">📦</span>
+                        ${escH(s.name)}
+                        <span style="color:#64748b;font-size:12px;font-weight:normal">${s.test_count} test${s.test_count!==1?'s':''} · agent: ${s.agent||'default'}</span>
+                        <span style="flex:1"></span>
+                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runSuiteFromPage('${escH(s.name)}')">▶ Run All</button>
+                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();renameSuite('${escH(s.name)}')">✏️ Rename</button>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();deleteSuite('${escH(s.name)}')">🗑️ Delete</button>
+                        <span style="color:#64748b;font-size:12px">▼</span>
+                    </h3>
+                    <div id="${fileId}" style="display:none;padding:0 4px">${testsHtml}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // ---- Tag-Based Suites ----
+        const tagEl = document.getElementById('tagSuitesList2');
+        const tagSuites = data.tag_suites || [];
+        if (tagSuites.length === 0) {
+            tagEl.innerHTML = '<div style="text-align:center;padding:15px;color:#475569">No tags assigned yet. Add tags when creating tests or use the form above.</div>';
+        } else {
+            tagEl.innerHTML = tagSuites.map(s => {
+                const tagId = 'tag-' + s.name.replace(/[^a-z0-9]/gi,'');
+                return `
+                <div class="suite-card">
+                    <h3 style="cursor:pointer" onclick="document.getElementById('${tagId}').style.display=document.getElementById('${tagId}').style.display==='none'?'block':'none'">
+                        <span style="font-size:18px">🏷️</span>
+                        ${escH(s.name)}
+                        <span style="color:#64748b;font-size:12px;font-weight:normal">${s.test_count} test${s.test_count!==1?'s':''}</span>
+                        <span style="flex:1"></span>
+                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runByTag('${escH(s.name)}')">▶ Run All</button>
+                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openTagModal('add','${escH(s.name)}')">+ Add</button>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();openTagModal('remove','${escH(s.name)}')">− Remove</button>
+                        <span style="color:#64748b;font-size:12px">▼</span>
+                    </h3>
+                    <div id="${tagId}" style="display:none;padding:0 4px">
+                        ${s.tests.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1e293b">
+                            <span style="font-size:13px">${escH(t)}</span>
+                            <button class="btn btn-outline btn-sm" onclick="runSingleTestFromSuite('${escH(t)}')" title="Run this test">▶</button>
+                        </div>`).join('')}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    } catch(e) { console.error('loadSuitesPage error:', e); }
+}
+
+function escH(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+async function createFileSuite() {
+    const name = document.getElementById('newSuiteName2').value.trim();
+    const agent = document.getElementById('newSuiteAgent2').value;
+    if (!name) { suiteAlert('Suite name is required.', 'error'); return; }
+
+    try {
+        const res = await fetch('/api/suites', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, agent})});
+        const data = await res.json();
+        if (res.ok) {
+            suiteAlert('✅ ' + data.message);
+            document.getElementById('newSuiteName2').value = '';
+            loadSuitesPage();
+            // Also update the suite dropdown in Create Test
+            refreshSuiteDropdown();
+        } else {
+            suiteAlert(data.error, 'error');
+        }
+    } catch(e) { suiteAlert(e.message, 'error'); }
+}
+
+async function refreshSuiteDropdown() {
+    try {
+        const res = await fetch('/api/suites');
+        const data = await res.json();
+        const select = document.getElementById('t-suite');
+        const current = select.value;
+        const names = (data.file_suites || []).map(s => s.name);
+        select.innerHTML = names.map(n => `<option value="${n}" ${n===current?'selected':''}>${n}</option>`).join('');
+    } catch(e) {}
+}
+
+async function renameSuite(oldName) {
+    const newName = prompt('New name for suite:', oldName);
+    if (!newName || newName === oldName) return;
+    try {
+        const res = await fetch('/api/suites/'+encodeURIComponent(oldName), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:newName})});
+        if (res.ok) { suiteAlert('Suite renamed.'); loadSuitesPage(); }
+    } catch(e) {}
+}
+
+async function deleteSuite(name) {
+    if (!confirm('Delete suite "'+name+'" and all its tests? This cannot be undone.')) return;
+    try {
+        const safeName = name.toLowerCase().replace(/ /g,'_');
+        await fetch('/api/testcases/'+encodeURIComponent(safeName), {method:'DELETE'});
+        suiteAlert('Suite "'+name+'" deleted.');
+        loadSuitesPage();
+    } catch(e) {}
+}
+
+async function moveTest(testName, fromSuite, toSuite) {
+    if (!toSuite) return;
+    try {
+        const res = await fetch('/api/suites/move-test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({test_name:testName, from_suite:fromSuite, to_suite:toSuite})});
+        const data = await res.json();
+        if (res.ok) {
+            suiteAlert('✅ ' + data.message);
+            loadSuitesPage();
+        } else {
+            suiteAlert(data.error, 'error');
+        }
+    } catch(e) {}
+}
+
+async function runSuiteFromPage(name) {
+    suiteAlert('<span class="spinner"></span> Running "'+name+'"...', 'info');
+    await fetch('/api/run/suite/'+encodeURIComponent(name), {method:'POST'});
+    const poll = setInterval(async () => {
+        const r = await fetch('/api/status'); const d = await r.json();
+        if (!d.is_running) { clearInterval(poll); suiteAlert('✅ Done! Go to Results to view.'); loadHomeResults(); }
+    }, 2000);
+}
+
+async function runSingleTestFromSuite(name) {
+    suiteAlert('<span class="spinner"></span> Running "'+name+'"...', 'info');
+    await fetch('/api/run/test/'+encodeURIComponent(name), {method:'POST'});
+    const poll = setInterval(async () => {
+        const r = await fetch('/api/status'); const d = await r.json();
+        if (!d.is_running) { clearInterval(poll); suiteAlert('✅ Done: '+name+'. Go to Results to view.'); loadHomeResults(); }
+    }, 2000);
+}
+
+async function runByTag(tagName) {
+    suiteAlert('<span class="spinner"></span> Running tag "'+tagName+'"...', 'info');
+    await fetch('/api/run/tag/'+encodeURIComponent(tagName), {method:'POST'});
+    const poll = setInterval(async () => {
+        const r = await fetch('/api/status'); const d = await r.json();
+        if (!d.is_running) { clearInterval(poll); suiteAlert('✅ Done! Go to Results to view.'); loadHomeResults(); }
+    }, 2000);
+}
+
+// --- Tag modal ---
+let _currentTagAction = '';
+let _currentTagName = '';
+
+async function openTagModal(action, tagName) {
+    if (!tagName) { suiteAlert('Enter a tag name first.', 'error'); return; }
+    _currentTagAction = action;
+    _currentTagName = tagName;
+
+    document.getElementById('tagAssignTitle').textContent = action === 'add' ? `Add tests to tag "${tagName}"` : `Remove tests from tag "${tagName}"`;
+
+    try {
+        const res = await fetch('/api/testcases/grouped');
+        const data = await res.json();
+        const testsEl = document.getElementById('tagAssignTests');
+        let html = '';
+        let count = 0;
+
+        for (const [suite, tests] of Object.entries(data.suites || {})) {
+            let suiteTests = '';
+            for (const t of tests) {
+                const hasTag = (t.tags || []).includes(tagName);
+                const show = action === 'add' ? !hasTag : hasTag;
+                if (!show) continue;
+                count++;
+                const tagsHtml = (t.tags||[]).map(tg=>'<span class="tag">'+tg+'</span>').join(' ');
+                suiteTests += `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #1e293b;font-size:13px">
+                    <input type="checkbox" value="${t.name}" style="width:auto;margin:0">
+                    ${t.name}
+                    <span style="margin-left:auto">${tagsHtml}</span>
+                </label>`;
+            }
+            if (suiteTests) {
+                html += `<div style="margin-bottom:10px"><div style="font-size:12px;color:#64748b;margin-bottom:4px;font-weight:600">📦 ${suite}</div>${suiteTests}</div>`;
+            }
+        }
+
+        if (!count) {
+            html = `<div style="text-align:center;padding:20px;color:#475569">${action==='add' ? 'All tests already have this tag.' : 'No tests have this tag.'}</div>`;
+        }
+        testsEl.innerHTML = html;
+        document.getElementById('tagAssignModal').style.display = 'flex';
+    } catch(e) { console.error(e); }
+}
+
+function closeTagModal() { document.getElementById('tagAssignModal').style.display = 'none'; }
+
+async function applyTagAssignment() {
+    const checkboxes = document.querySelectorAll('#tagAssignTests input[type=checkbox]:checked');
+    const testNames = Array.from(checkboxes).map(cb => cb.value);
+    if (!testNames.length) { alert('Select at least one test.'); return; }
+
+    const url = _currentTagAction === 'add' ? '/api/suites/tag' : '/api/suites/untag';
+    try {
+        const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tag:_currentTagName, test_names:testNames})});
+        const data = await res.json();
+        closeTagModal();
+        suiteAlert('✅ ' + data.message);
+        loadSuitesPage();
+    } catch(e) { suiteAlert(e.message, 'error'); }
+}
+
+// ===== Run Tests =====
+function getSelectedAgent() {
+    const sel = document.getElementById('runAgentSelect');
+    return sel ? sel.value : '';
+}
+
+async function loadSuites() {
+    try {
+        // Populate agent dropdown
+        try {
+            const agentRes = await fetch('/api/agents/current');
+            const agentData = await agentRes.json();
+            const agentSel = document.getElementById('runAgentSelect');
+            const current = agentSel.value;
+            agentSel.innerHTML = '<option value="">Default (as configured per test)</option>';
+            (agentData.agents || []).forEach(a => {
+                agentSel.innerHTML += `<option value="${a.name}" ${a.name===current?'selected':''}>${a.name} (${a.type})</option>`;
+            });
+        } catch(e) {}
+
+        // Load tag suites for the Run by Tag section
+        const tagRes = await fetch('/api/suites');
+        const tagData = await tagRes.json();
+        const tagSection = document.getElementById('runTagSection');
+        const tagBtns = document.getElementById('runTagButtons');
+        if (tagData.tag_suites && tagData.tag_suites.length > 0) {
+            tagSection.style.display = 'block';
+            tagBtns.innerHTML = tagData.tag_suites.map(s => 
+                `<button class="btn btn-outline" onclick="runByTagFromRun('${escH(s.name)}')">🏷️ ${s.name} <span style="color:#64748b;font-size:11px">(${s.test_count})</span></button>`
+            ).join('');
+        } else {
+            tagSection.style.display = 'none';
+        }
+
+        const res = await fetch('/api/testcases');
+        const data = await res.json();
+        const el = document.getElementById('suitesList');
+        if (!data.test_cases || data.test_cases.length===0) {
+            el.innerHTML = '<div class="empty-state"><div class="icon">📝</div>No test scenarios found.<br>Create tests in the Test Cases tab first.</div>';
+            return;
+        }
+        // Group test cases by suite (client-side)
+        const suites = {};
+        for (const tc of data.test_cases) {
+            if (!suites[tc.suite]) suites[tc.suite] = [];
+            suites[tc.suite].push(tc);
+        }
+        let html = '';
+        for (const [suite, tests] of Object.entries(suites)) {
+            const suiteId = 'suite-' + suite.replace(/[^a-z0-9]/gi,'');
+            html += `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:10px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1a2332;cursor:pointer" onclick="document.getElementById('${suiteId}').style.display=document.getElementById('${suiteId}').style.display==='none'?'block':'none'">
+                    <span style="font-weight:600">📦 ${suite} <span style="color:#64748b;font-weight:normal">(${tests.length} tests)</span></span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();runSuite('${suite}')">▶ Run Suite</button>
+                        <span style="color:#64748b">▼</span>
+                    </div>
+                </div>
+                <div id="${suiteId}" style="display:none;padding:8px 16px">
+                    ${tests.map(t => {
+                        const tagsHtml = (t.tags || []).map(tg => `<span class="tag">${tg}</span>`).join('');
+                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b">
+                        <div style="flex:1">
+                            <span style="font-size:13px">${t.name}</span>
+                            <span style="color:#475569;font-size:11px;margin-left:8px">${t.type} · ${t.assertions} assertions · ${t.evaluators} evaluators</span>
+                            ${tagsHtml ? '<span style="margin-left:6px">' + tagsHtml + '</span>' : ''}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span style="color:#64748b;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.input}</span>
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();runSingleTest('${t.name}')" title="Run this test">▶</button>
+                        </div>
+                    </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+        html += `<div style="margin-top:4px;color:#64748b;font-size:12px">Total: ${data.total} tests across ${Object.keys(suites).length} suites</div>`;
+        el.innerHTML = html;
+    } catch(e) { console.error(e); }
+}
+
+// Shared polling with live progress
+function pollProgress(statusEl, onDone) {
+    const poll = setInterval(async () => {
+        try {
+            const r = await fetch('/api/status');
+            const d = await r.json();
+            if (d.is_running && d.progress) {
+                const p = d.progress;
+                let html = `<span class="spinner"></span> Running ${p.completed}/${p.total}`;
+                if (p.current) html += ` — <strong>${p.current}</strong>`;
+                // Show completed results as mini badges
+                if (p.results && p.results.length > 0) {
+                    html += '<div style="margin-top:6px;font-size:11px">';
+                    for (const r of p.results) {
+                        const color = r.status==='passed' ? '#22c55e' : r.status==='failed' ? '#ef4444' : '#eab308';
+                        html += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;border-radius:4px;background:${color}20;color:${color}">${r.icon} ${r.name} (${r.latency_ms}ms)</span>`;
+                    }
+                    html += '</div>';
+                }
+                if (statusEl) statusEl.innerHTML = html;
+            } else if (!d.is_running) {
+                clearInterval(poll);
+                if (onDone) onDone();
+            }
+        } catch(e) {}
+    }, 1500);
+    return poll;
+}
+
+async function runAllTests() {
+    const btn = document.getElementById('homeRunBtn');
+    const status = document.getElementById('homeRunStatus') || document.getElementById('runPageStatus');
+    if (btn) { btn.disabled=true; btn.textContent='⏳ Running...'; }
+    if (status) status.innerHTML = '<span class="spinner"></span> Starting...';
+    const agent = getSelectedAgent();
+    const body = agent ? {agent} : null;
+    try {
+        await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+        pollProgress(status, () => {
+            if(btn){btn.disabled=false; btn.textContent='▶ Run All Tests';}
+            if(status) status.textContent='✅ Done!';
+            loadResults(); loadHomeResults();
+            setTimeout(()=>{if(status)status.textContent='';},3000);
+        });
+    } catch(e) { if(btn){btn.disabled=false; btn.textContent='▶ Run All Tests';} }
+}
+
+async function runSuite(name) {
+    const status = document.getElementById('runPageStatus');
+    status.innerHTML = '<span class="spinner"></span> Running '+name+'...';
+    const agent = getSelectedAgent();
+    const body = agent ? {agent} : null;
+    await fetch('/api/run/suite/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    pollProgress(status, () => { status.textContent='✅ Done!'; loadResults(); loadHomeResults(); });
+}
+
+async function runSingleTest(name) {
+    const status = document.getElementById('runPageStatus');
+    status.innerHTML = '<span class="spinner"></span> Running '+name+'...';
+    const agent = getSelectedAgent();
+    const body = agent ? {agent} : null;
+    await fetch('/api/run/test/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    pollProgress(status, () => { status.textContent='✅ Done: '+name; loadResults(); loadHomeResults(); });
+}
+
+async function runByTagFromRun(tagName) {
+    const status = document.getElementById('runPageStatus');
+    status.innerHTML = '<span class="spinner"></span> Running tag "'+tagName+'"...';
+    const agent = getSelectedAgent();
+    const body = agent ? {agent} : null;
+    await fetch('/api/run/tag/'+encodeURIComponent(tagName), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    pollProgress(status, () => { status.textContent='✅ Done: '+tagName; loadResults(); loadHomeResults(); });
+}
+
+// ===== Results =====
+let _cachedResults = null;
+
+async function loadResults() {
+    try {
+        // Check if a run is in progress — show indicator but keep old results
+        const statusRes = await fetch('/api/status');
+        const statusData = await statusRes.json();
+        const runBanner = document.getElementById('resultsRunBanner');
+        if (statusData.is_running && statusData.progress) {
+            const p = statusData.progress;
+            if (runBanner) runBanner.innerHTML = `<div class="alert alert-info" style="margin-bottom:12px"><span class="spinner"></span> Tests running: ${p.completed}/${p.total}${p.current ? ' — <strong>'+p.current+'</strong>' : ''}. Results below are from the previous run.</div>`;
+        } else {
+            if (runBanner) runBanner.innerHTML = '';
+        }
+
+        const res = await fetch('/api/results');
+        if(!res.ok) {
+            // Only show empty state if we don't have cached results
+            if (!_cachedResults) {
+                document.getElementById('resultsTableBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">No results yet. Run tests first.</td></tr>';
+            }
+            return;
+        }
+        const data = await res.json();
+        _cachedResults = data;
+
+        // Populate agent filter
+        const agents = [...new Set((data.results||[]).map(r => r.agent||'default'))];
+        const agentFilter = document.getElementById('resultsAgentFilter');
+        const currentAgent = agentFilter.value;
+        agentFilter.innerHTML = '<option value="">All Agents</option>' + agents.map(a => `<option value="${a}" ${a===currentAgent?'selected':''}>${a}</option>`).join('');
+
+        applyResultsFilter();
+    } catch(e) {}
+}
+
+function applyResultsFilter() {
+    if (!_cachedResults) return;
+    const agentFilter = document.getElementById('resultsAgentFilter').value;
+    const statusFilter = document.getElementById('resultsStatusFilter').value;
+
+    let filtered = [...(_cachedResults.results || [])];
+    if (agentFilter) filtered = filtered.filter(r => (r.agent||'default') === agentFilter);
+    if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+
+    const filteredData = { ...(_cachedResults), results: filtered };
+    document.getElementById('resultsCount').textContent = `Showing ${filtered.length} of ${(_cachedResults.results||[]).length} results`;
+    renderResultsTable(filteredData, 'resultsTableBody', true);
+}
+
+async function clearResults() {
+    if (!confirm('Clear all results? This cannot be undone.')) return;
+    await fetch('/api/results', {method:'DELETE'});
+    _cachedResults = null;
+    document.getElementById('resultsTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#475569;padding:20px">Results cleared.</td></tr>';
+    document.getElementById('resultsCount').textContent = '';
+    loadHomeResults();
+}
+
+async function loadHomeResults() {
+    try {
+        const res = await fetch('/api/results'); if(!res.ok) return;
+        const data = await res.json();
+        document.getElementById('c-total').textContent = data.total||0;
+        document.getElementById('c-passed').textContent = data.passed||0;
+        document.getElementById('c-failed').textContent = data.failed||0;
+        const rate = data.total>0 ? Math.round((data.passed/data.total)*100) : 0;
+        const rateEl = document.getElementById('c-rate');
+        rateEl.textContent = rate+'%';
+        rateEl.style.color = rate>=80?'#22c55e':rate>=50?'#eab308':'#ef4444';
+        document.getElementById('c-duration').textContent = (data.duration_seconds||0).toFixed(1)+'s';
+        renderResultsTable(data, 'homeTableBody', false);
+    } catch(e) {}
+}
+
+function renderResultsTable(data, tbodyId, detailed) {
+    const results = data.results||[];
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = results.map((r,i) => {
+        const icon = r.status==='passed'?'✅':r.status==='failed'?'❌':'⚠️';
+        const cls = r.status==='passed'?'status-pass':r.status==='failed'?'status-fail':'status-error';
+
+        // Render scores as colored badges with backend indicator
+        let scores='—';
+        if(r.scores && Object.keys(r.scores).length > 0){
+            scores = Object.entries(r.scores).map(([n,v])=>{
+                const bg = v.passed ? '#22c55e20' : '#ef444420';
+                const fg = v.passed ? '#22c55e' : '#ef4444';
+                const backend = v.backend || 'builtin';
+                const prefix = backend === 'deepeval' ? '🧪' : backend === 'azure' ? '☁️' : '';
+                return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:${bg};color:${fg};margin:1px 3px">${prefix}${n}: ${v.score.toFixed(2)}</span>`;
+            }).join('');
+        }
+
+        let asserts='';
+        if(detailed&&r.assertions){const p=r.assertions.filter(a=>a.passed).length;asserts=`<td>${p}/${r.assertions.length}</td>`;}
+
+        const id='conv-'+i;
+        let conv='';
+
+        // Build expandable detail section
+        let detailContent = '';
+
+        // Show error message prominently if present
+        if (r.error) {
+            detailContent += `<div style="padding:10px 12px;background:#ef444415;border:1px solid #ef444440;border-radius:6px;margin-bottom:8px;color:#ef4444;font-size:13px">
+                <strong>⚠️ Error:</strong> ${r.error}
+            </div>`;
+        }
+
+        // Show scores detail
+        if(r.scores && Object.keys(r.scores).length > 0) {
+            detailContent += '<div style="padding:10px 14px;background:#1e293b;border-radius:6px;margin-bottom:8px"><div style="font-size:13px;color:#cbd5e1;margin-bottom:8px;font-weight:600">Evaluation Scores:</div>';
+            for(const [n,v] of Object.entries(r.scores)) {
+                const bar = Math.round(v.score * 100);
+                const color = v.passed ? '#22c55e' : '#ef4444';
+                const bk = v.backend || 'builtin';
+                const bkLabel = bk === 'deepeval' ? '<span style="color:#f97316;font-size:10px">🧪DE</span> ' : bk === 'azure' ? '<span style="color:#3b82f6;font-size:10px">☁️AZ</span> ' : '';
+                detailContent += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <span style="width:160px;font-size:13px;color:#cbd5e1;font-weight:500">${bkLabel}${n}</span>
+                    <div style="flex:1;height:8px;background:#334155;border-radius:4px"><div style="width:${bar}%;height:100%;background:${color};border-radius:4px"></div></div>
+                    <span style="font-size:13px;font-weight:600;color:${color};min-width:40px">${v.score.toFixed(2)}</span>
+                </div>
+                ${v.reason ? '<div style="margin-left:168px;margin-bottom:6px;font-size:12px;color:#e2e8f0;line-height:1.5">' + v.reason + '</div>' : ''}`;
+            }
+            detailContent += '</div>';
+        }
+
+        // Show failed scores with reasons inline
+        if(r.scores && Object.keys(r.scores).length > 0) {
+            const failed = Object.entries(r.scores).filter(([,v]) => !v.passed && v.reason);
+            if (failed.length > 0) {
+                for (const [n, v] of failed) {
+                    detailContent += `<div style="padding:8px 14px;background:#ef444415;border:1px solid #ef444430;border-radius:6px;margin-bottom:6px;font-size:13px;color:#fca5a5;line-height:1.5">❌ <strong>${n}</strong>: ${v.reason}</div>`;
+                }
+            }
+        }
+
+        // Show assertion details
+        if(detailed && r.assertions && r.assertions.length){
+            detailContent += '<div style="padding:10px 14px;background:#1e293b;border-radius:6px;margin-bottom:8px"><div style="font-size:13px;color:#cbd5e1;margin-bottom:8px;font-weight:600">Assertions:</div>';
+            for(const a of r.assertions){
+                const aIcon = a.passed ? '✅' : '❌';
+                detailContent += `<div style="font-size:13px;margin-bottom:4px;color:#e2e8f0">${aIcon} <strong>${a.name}</strong> ${a.passed?'':'<div style="color:#f87171;font-size:12px;margin-left:24px;margin-top:2px;line-height:1.4">'+(a.message||'failed')+'</div>'}</div>`;
+            }
+            detailContent += '</div>';
+        }
+
+        // Show tool calls if any
+        if(r.tool_calls && r.tool_calls.length > 0) {
+            detailContent += '<div style="padding:8px 12px;background:#1e293b;border-radius:6px;margin-bottom:8px"><div style="font-size:11px;color:#f97316;margin-bottom:6px">🔧 Tool Calls (' + r.tool_calls.length + '):</div>';
+            for (const tc of r.tool_calls) {
+                const argsStr = tc.arguments ? JSON.stringify(tc.arguments) : '{}';
+                detailContent += `<div style="font-size:12px;margin-bottom:4px;padding:4px 8px;background:#0f172a;border-radius:4px">
+                    <strong style="color:#f97316">${tc.name}</strong>
+                    <span style="color:#64748b;margin-left:8px;font-size:11px">${argsStr.substring(0,200)}</span>
+                </div>`;
+            }
+            detailContent += '</div>';
+        }
+
+        // Show conversation messages
+        if(r.messages && r.messages.length){
+            let msgs = '';
+            let turnNum = 0;
+            for (let mi = 0; mi < r.messages.length; mi++) {
+                const m = r.messages[mi];
+                if (m.role === 'user') {
+                    turnNum++;
+                    if (r.messages.length > 2) {
+                        msgs += `<div style="font-size:11px;color:#3b82f6;margin-top:${turnNum>1?'12px':'0'};margin-bottom:4px;font-weight:600">Turn ${turnNum}</div>`;
+                    }
+                }
+                msgs += `<div class="msg ${m.role==='user'?'msg-user':'msg-agent'}"><div class="msg-role">${m.role==='user'?'👤 User':'🤖 Agent'}</div><div style="white-space:pre-wrap;word-break:break-word">${m.content}</div></div>`;
+            }
+            detailContent += msgs;
+        }
+
+        // Always create expandable section if there's any content
+        if (detailed && detailContent) {
+            conv=`<tr><td colspan="7"><div class="conv-trace" id="${id}">${detailContent}</div></td></tr>`;
+        }
+
+        // Show error snippet in the scores column for quick visibility
+        const errorHint = r.error ? `<span style="color:#ef4444;font-size:11px" title="${r.error}">${r.error.substring(0,50)}${r.error.length>50?'...':''}</span>` : '';
+
+        const agentName = r.agent || 'default';
+        return `<tr onclick="document.getElementById('${id}')?.classList.toggle('show')" style="cursor:pointer"><td><strong>${r.scenario}</strong></td><td style="color:#64748b">${r.suite}</td><td style="color:#60a5fa;font-size:12px">${agentName}</td><td class="${cls}">${icon}</td><td style="max-width:400px">${scores || errorHint}</td>${detailed?asserts:''}<td style="color:#94a3b8">${Math.round(r.latency_ms)}ms</td></tr>${conv}`;
+    }).join('');
+}
+
+// ===== Run History =====
+async function loadRunHistory() {
+    const panel = document.getElementById('runHistoryPanel');
+    panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+    if (panel.style.display==='none') return;
+
+    try {
+        const res = await fetch('/api/runs');
+        const data = await res.json();
+        const el = document.getElementById('runHistoryList');
+        if (!data.runs || data.runs.length===0) {
+            el.innerHTML = '<div style="color:#475569;padding:8px">No past runs found.</div>';
+            return;
+        }
+        el.innerHTML = data.runs.map(r => {
+            const passRate = r.total > 0 ? Math.round((r.passed/r.total)*100) : 0;
+            const color = passRate>=80?'#22c55e':passRate>=50?'#eab308':'#ef4444';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155">
+                <div>
+                    <span style="font-size:13px">${r.id}</span>
+                    <span style="color:#475569;font-size:11px;margin-left:8px">${r.timestamp ? r.timestamp.substring(0,19) : ''}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:12px;color:${color}">${r.passed}/${r.total} passed (${passRate}%)</span>
+                    <span style="color:#475569;font-size:11px">${r.duration.toFixed(1)}s</span>
+                    <button class="btn btn-outline btn-sm" onclick="loadRunResults('${r.id}')">View</button>
+                    <a href="/api/download/report/${r.id}" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📥</a>
+                    <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="deleteRun('${r.id}')">🗑️</button>
+                </div>
+            </div>`;
+        }).join('');
+        el.innerHTML += '<div style="margin-top:8px;text-align:right"><button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="deleteAllRuns()">🗑️ Delete All History</button></div>';
+    } catch(e) { console.error(e); }
+}
+
+async function loadRunResults(runId) {
+    try {
+        const res = await fetch('/api/runs/'+runId);
+        if(!res.ok) return;
+        const data = await res.json();
+        renderResultsTable(data, 'resultsTableBody', true);
+    } catch(e) {}
+}
+
+async function deleteRun(runId) {
+    if (!confirm('Delete run "'+runId+'"?')) return;
+    await fetch('/api/runs/'+encodeURIComponent(runId), {method:'DELETE'});
+    loadRunHistory();
+}
+
+async function deleteAllRuns() {
+    if (!confirm('Delete ALL run history? This cannot be undone.')) return;
+    await fetch('/api/runs', {method:'DELETE'});
+    loadRunHistory();
+}
+
+// ===== Settings =====
+function toggleKeyVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🔒';
+        btn.title = 'Hide key';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+        btn.title = 'Show key';
+    }
+}
+async function saveSettings() {
+    const el = document.getElementById('settingsAlert');
+    const azureKey = document.getElementById('set-azure-key').value;
+    const openaiKey = document.getElementById('set-openai-key').value;
+    try {
+        if(azureKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_API_KEY',key:azureKey})});
+        if(openaiKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'OPENAI_API_KEY',key:openaiKey})});
+        el.innerHTML = '<div class="alert alert-success">✅ Keys saved to .env</div>';
+    } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function loadConfigDisplay() {
+    try {
+        // Load config
+        const res = await fetch('/api/config');
+        const data = await res.json();
+
+        // Load actual key values for pre-filling
+        const keysRes = await fetch('/api/settings/keys');
+        const keys = await keysRes.json();
+
+        // Pre-fill key fields with actual values (shown as password dots)
+        if (keys.azure_api_key) {
+            document.getElementById('set-azure-key').value = keys.azure_api_key;
+        }
+        if (keys.openai_api_key) {
+            document.getElementById('set-openai-key').value = keys.openai_api_key;
+        }
+
+        // Show key status banner
+        const statusEl = document.getElementById('settingsKeyStatus');
+        if (keys.has_azure_key) {
+            statusEl.innerHTML = '<div class="alert alert-success">🔑 Azure API Key is set. Click 👁 to view, or paste a new key to update.</div>';
+        } else if (data.has_entra_id) {
+            statusEl.innerHTML = '<div class="alert alert-success">🔐 Azure Entra ID active (keyless auth via az login). No API key needed.</div>';
+        } else {
+            statusEl.innerHTML = '<div class="alert alert-error">🔑 No authentication configured. Set an API key below, or run <code>az login</code> for keyless auth.</div>';
+        }
+
+        // Config display
+        const authLabel = data.auth_method === 'api_key'
+            ? '✅ API Key (' + data.masked_api_key + ')'
+            : data.auth_method === 'entra_id'
+            ? '🔐 Azure Entra ID (keyless)'
+            : '❌ Not configured';
+        let html = `<div style="padding:6px 0;border-bottom:1px solid #334155"><span style="color:#94a3b8">Project:</span> ${data.project}</div>`;
+        html += `<div style="padding:6px 0;border-bottom:1px solid #334155"><span style="color:#94a3b8">Eval Backend:</span> ${data.evaluation_backend}</div>`;
+        html += `<div style="padding:6px 0;border-bottom:1px solid #334155"><span style="color:#94a3b8">Agent Auth:</span> ${authLabel}</div>`;
+        if (data.eval_endpoint) {
+            html += `<div style="padding:6px 0;border-bottom:1px solid #334155"><span style="color:#94a3b8">Eval Endpoint:</span> ${data.eval_endpoint} ${data.has_eval_key ? '(key set)' : '(Entra ID)'}</div>`;
+        }
+        for (const [name,a] of Object.entries(data.agents||{})) {
+            html += `<div style="padding:6px 0;border-bottom:1px solid #334155"><span style="color:#94a3b8">Agent "${name}":</span> ${a.type} — ${a.endpoint||''} ${a.agent_name?'('+a.agent_name+')':''}</div>`;
+        }
+        document.getElementById('configDisplay').innerHTML = html;
+    } catch(e) { console.error('loadConfigDisplay error:', e); }
+}
+
+// ===== Init =====
+loadHomeResults();
+</script>
+</body>
+</html>
