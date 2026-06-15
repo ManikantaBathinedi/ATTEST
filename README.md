@@ -88,11 +88,25 @@ Want to see ATTEST in action first? It ships with example tests for **every test
 that run offline against a built-in `mock` agent:
 
 ```bash
+# 1. Clone and enter the repo
+git clone https://github.com/ManikantaBathinedi/ATTEST.git
+cd ATTEST
+
+# 2. Create & activate a virtual environment
+python -m venv .venv
+# Windows (PowerShell):  .\.venv\Scripts\Activate.ps1
+# macOS / Linux:         source .venv/bin/activate
+
+# 3. Install, then explore
 pip install -e "."
 attest examples           # list the bundled example suites
 attest examples --run     # run the offline ones against the mock agent
 attest serve              # explore sample results for every type in the dashboard
 ```
+
+> **`attest` not found?** The `attest` command only exists while your virtual environment is
+> **activated** (Step 2). Re-run the activate line in any new terminal, or call it directly with
+> `.\.venv\Scripts\attest serve` (Windows) / `.venv/bin/attest serve` (macOS/Linux).
 
 The dashboard's Results page is pre-populated with **sample results** so nothing is empty on
 first launch. Hide them anytime in **Settings → Demo & Example Data**. When you're ready to
@@ -103,6 +117,12 @@ test your own agent, follow the steps below.
 ```bash
 git clone https://github.com/ManikantaBathinedi/ATTEST.git
 cd ATTEST
+
+# Create & activate a virtual environment (so the `attest` command is on your PATH)
+python -m venv .venv
+# Windows (PowerShell):  .\.venv\Scripts\Activate.ps1
+# macOS / Linux:         source .venv/bin/activate
+
 pip install -e "."
 
 # Optional evaluation backends & adapters
@@ -113,6 +133,10 @@ pip install -e ".[langchain]"   # LangChain adapter
 pip install -e ".[langgraph]"   # LangGraph adapter
 pip install -e ".[all]"         # Everything
 ```
+
+> **Remember:** activate the venv (`.\.venv\Scripts\Activate.ps1` on Windows) in **every new
+> terminal** before running `attest ...`. You'll see `(.venv)` at the start of your prompt when
+> it's active.
 
 ### 2. Initialize
 

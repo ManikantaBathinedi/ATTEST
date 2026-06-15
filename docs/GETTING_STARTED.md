@@ -24,11 +24,21 @@ cd ATTEST
 python -m venv .venv
 
 # Activate it:
-# Windows:
-.venv\Scripts\activate
+# Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# Windows (cmd):
+.venv\Scripts\activate.bat
 # Mac/Linux:
 source .venv/bin/activate
 ```
+
+> **Important — do this in every new terminal.** The `attest` command only exists while the
+> virtual environment is **activated**. When it's active you'll see `(.venv)` at the start of
+> your prompt. If you ever see *"attest is not recognized"* (Windows) or *"command not found"*
+> (Mac/Linux), you just need to re-run the activate line above.
+>
+> On Windows, if `Activate.ps1` is blocked by execution policy, run this once in the same
+> terminal first: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`.
 
 ---
 
@@ -273,6 +283,7 @@ Results are saved to `reports/results.json` automatically.
 
 | Problem | Fix |
 |---------|-----|
+| `attest is not recognized` / `command not found` | Activate the venv first: `.\.venv\Scripts\Activate.ps1` (Windows) or `source .venv/bin/activate` (Mac/Linux). Or call it directly: `.\.venv\Scripts\attest serve`. |
 | `No agents configured` | Edit `attest.yaml` → add your agent |
 | `No test scenarios found` | Create YAML files in `tests/scenarios/` |
 | `Authentication failed` | Put your API key in `.env` **or** run `az login` for keyless auth |

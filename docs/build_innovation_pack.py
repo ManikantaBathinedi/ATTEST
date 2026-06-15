@@ -74,10 +74,10 @@ M3_SUB = "Production incidents & LLM eval spend (caching)"
 SOLUTION = (
     "ATTEST is an end-to-end agent testing framework that standardizes how agents are "
     "validated before and after release.\n"
-    "28 deterministic assertions verify tool calls, JSON outputs, routing, content & performance\n"
-    "32 LLM-based evaluators (built-in + DeepEval + Azure AI Evaluation SDK) score quality, safety & groundedness\n"
-    "Golden baselines automatically detect regressions across agent versions\n"
-    "Web dashboard + CLI + CI integration deliver repeatable quality gates"
+    "32 deterministic assertions verify tool calls, JSON, routing, content, PII, cost & performance\n"
+    "36 LLM-based evaluators across 4 backends (built-in, DeepEval, Azure AI & RAGAS) score quality, safety & groundedness\n"
+    "Multi-turn conversations, user simulation & security red-teaming (30 attacks) stress-test agents\n"
+    "Golden baselines detect regressions; web dashboard + CLI + CI deliver repeatable quality gates"
 )
 
 BUSINESS_VALUE = (
@@ -89,18 +89,18 @@ BUSINESS_VALUE = (
 )
 
 KEY_TECH = (
-    "Deterministic Assertion Engine \u2013 28 checks for tool calls, JSON, routing, content & performance\n"
-    "LLM Evaluator Suite \u2013 32 evaluators across built-in, DeepEval & Azure AI Evaluation SDK\n"
-    "Pluggable Adapters \u2013 Foundry prompt, HTTP REST, Callable & auto-detect for any agent\n"
-    "Baseline / Golden Regression \u2013 snapshot & diff agent responses across versions\n"
-    "Enterprise Auth (5-tier) + FastAPI dashboard + Typer CLI + CI/CD integration"
+    "Deterministic Assertion Engine \u2013 32 checks for tool calls, JSON, routing, content, PII, cost & performance\n"
+    "LLM Evaluator Suite \u2013 36 evaluators across 4 backends: built-in, DeepEval, Azure AI Evaluation & RAGAS\n"
+    "9 Pluggable Adapters \u2013 Foundry, HTTP REST, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants & MCP (plus offline mock)\n"
+    "Multi-turn, user simulation, security red-teaming (30 attacks) & multi-agent routing assertions\n"
+    "Baseline / golden regression + Enterprise Auth (5-tier) + FastAPI dashboard + Typer CLI + CI/CD integration"
 )
 
 STATE = (
-    "Core framework, 28 assertions, 32 evaluators, 4 adapters, baselines & 8-page dashboard are built and working\n"
+    "Core framework, 32 assertions, 36 evaluators (4 backends), 9 adapters, security red-teaming, baselines & 9-page dashboard are built and working\n"
     "Next Steps\n"
-    "Expand adapter coverage for A2A & MCP multi-agent scenarios\n"
     "Pilot on real production agents\n"
+    "Broaden multi-agent / A2A & MCP scenario coverage\n"
     "Integrate quality gates into CI/CD pipelines"
 )
 
@@ -115,7 +115,7 @@ RISKS = (
     "Model Access (Azure OpenAI / Foundry)\n"
     "Evaluators require model endpoints to score agent responses\n"
     "Agent Accessibility\n"
-    "Agents must be reachable via a supported adapter (Foundry / HTTP / Callable)\n"
+    "Agents must be reachable via a supported adapter (Foundry / HTTP / Callable / framework adapters)\n"
     "GHCP / Copilot License\n"
     "Required for Copilot agent integration scenarios"
 )
@@ -310,14 +310,14 @@ def build_attest_diagram(slide, L, T, W, H):
     b_l = Emu(int(L + 0.01 * W))
     c_l = Emu(int(L + W - 0.01 * W - b_w))
     add_box(slide, b_l, b_t, b_w, b_h,
-            "Assertion Engine (28)",
+            "Assertion Engine (32)",
             ["Tool Calls", "JSON Schema", "Routing & Handoff",
-             "Content & Response", "Performance", "Baseline / Golden"],
+             "Content · PII · Cost", "Performance", "Baseline / Golden"],
             title_size=11, body_size=8)
     add_box(slide, c_l, b_t, b_w, b_h,
-            "LLM Evaluators (32)",
-            ["Built-in (5)", "DeepEval (12)", "Azure AI Eval (15)",
-             "Quality & Relevance", "Safety & Bias", "Groundedness"],
+            "LLM Evaluators (36)",
+            ["Built-in (5)", "DeepEval (12)", "Azure AI (15)",
+             "RAGAS (4)", "Safety & Bias", "Groundedness"],
             title_size=11, body_size=8)
 
     # 3) Converge: Agent Adapters
@@ -325,8 +325,8 @@ def build_attest_diagram(slide, L, T, W, H):
     d_l = Emu(int(cx - d_w / 2))
     d_t = y(0.58)
     add_box(slide, d_l, d_t, d_w, d_h,
-            "Agent Under Test \u2014 Adapters",
-            ["Foundry  /  HTTP REST  /  Callable  /  Auto-detect",
+            "Agent Under Test \u2014 9 Adapters",
+            ["Foundry · HTTP · Callable · LangChain · LangGraph · CrewAI · AutoGen · OpenAI · MCP",
              "5-tier Enterprise Auth (Key \u2192 SP \u2192 WIF \u2192 MI \u2192 Default)"],
             title_size=11, body_size=8, fill=TEAL_DARK)
 

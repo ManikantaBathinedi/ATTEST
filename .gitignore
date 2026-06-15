@@ -40,3 +40,4 @@ Thumbs.db
 # Node (dashboard)
 node_modules/
 attest/dashboard/frontend/dist/
+~$*.pptx

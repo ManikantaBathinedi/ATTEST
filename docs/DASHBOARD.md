@@ -1,6 +1,10 @@
 # ATTEST — Web Dashboard
 
 > `attest serve` → opens http://localhost:8080
+>
+> *(Activate your virtual environment first so `attest` is on your PATH — see
+> [Getting Started → Step 2](GETTING_STARTED.md). On Windows you can also run it directly with
+> `.\.venv\Scripts\attest serve`.)*
 
 ## Overview
 
