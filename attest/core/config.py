@@ -90,6 +90,22 @@ def _load_yaml_file(path: Path) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Deep merge for profile overrides
+# ---------------------------------------------------------------------------
+
+
+def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge overrides into base dict. Overrides win on conflicts."""
+    merged = dict(base)
+    for key, value in overrides.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -97,6 +113,7 @@ def _load_yaml_file(path: Path) -> Dict[str, Any]:
 def load_config(
     path: Optional[Union[str, Path]] = None,
     load_env: bool = True,
+    profile: Optional[str] = None,
 ) -> AttestConfig:
     """Load ATTEST configuration from a YAML file.
 
@@ -104,19 +121,17 @@ def load_config(
         path: Explicit path to config file. If None, searches for attest.yaml
               in the current directory.
         load_env: Whether to load .env / .env.local files. Defaults to True.
+        profile: Environment profile to activate (e.g. "dev", "staging", "prod").
+                 Overrides base config with values from the profiles section.
+                 Falls back to ATTEST_PROFILE env var if not specified.
 
     Returns:
         Validated AttestConfig object with all env vars resolved.
 
     Examples:
-        # Auto-find attest.yaml in current dir
-        config = load_config()
-
-        # Explicit path
-        config = load_config("my_project/attest.yaml")
-
-        # Returns defaults if no file found
-        config = load_config()  # no attest.yaml → all defaults
+        config = load_config()                        # default profile
+        config = load_config(profile="staging")       # staging overrides
+        config = load_config()                        # ATTEST_PROFILE=prod → prod overrides
     """
     # Step 1: Load .env files (so env vars are available for resolution)
     if load_env:
@@ -140,6 +155,23 @@ def load_config(
 
     # Step 3: Resolve environment variable references
     resolved_data = _resolve_env_vars(raw_data)
+
+    # Step 3b: Apply environment profile overrides
+    active_profile = profile or os.environ.get("ATTEST_PROFILE")
+    if active_profile and "profiles" in resolved_data:
+        profiles = resolved_data.pop("profiles", {})
+        if active_profile in profiles:
+            profile_overrides = profiles[active_profile]
+            if isinstance(profile_overrides, dict):
+                resolved_data = _deep_merge(resolved_data, profile_overrides)
+        else:
+            available = ", ".join(profiles.keys())
+            raise ConfigError(
+                f"Profile '{active_profile}' not found. Available profiles: {available}"
+            )
+    elif "profiles" in resolved_data:
+        # Remove profiles section even if not used — it's not a config field
+        resolved_data.pop("profiles", None)
 
     # Step 4: Validate and return
     try:

@@ -1,0 +1,32 @@
+# ============================================================
+# EXAMPLE — Single-Turn Tests
+# ============================================================
+# The simplest test type: send one message, check the response.
+# Runs offline against the built-in `mock_agent` (no API key needed).
+# Swap `agent: mock_agent` for your own configured agent to test it.
+# ============================================================
+
+name: "Example · Single Turn"
+agent: mock_agent
+
+tests:
+  - name: greeting
+    input: "Hello! What can you help me with?"
+    assertions:
+      - response_not_empty: true
+      - latency_under: 5000
+    tags: [example, smoke]
+
+  - name: japan_destinations
+    input: "What are the best places to visit in Japan?"
+    assertions:
+      - response_not_empty: true
+      - response_contains_any: ["Tokyo", "Kyoto", "Osaka", "Japan"]
+    tags: [example]
+
+  - name: stays_on_topic
+    input: "Recommend a few travel destinations."
+    assertions:
+      - response_not_empty: true
+      - response_not_contains: "error"
+    tags: [example]

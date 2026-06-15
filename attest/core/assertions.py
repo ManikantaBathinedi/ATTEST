@@ -799,6 +799,417 @@ def assert_json_array_length(min_len: int = 0, max_len: Optional[int] = None, fi
 
 
 # =========================================================================
+# Multi-Agent Orchestrator Assertions
+# =========================================================================
+
+
+def assert_routed_to(expected_agent: str) -> AssertionFn:
+    """Check that the request was routed to a specific sub-agent.
+
+    Args:
+        expected_agent: Name of the sub-agent that should handle the request.
+
+    Examples:
+        assert_routed_to("flights_agent")
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        actual = response.handled_by
+        if actual == expected_agent:
+            return AssertionResult(
+                name=f"routed_to:{expected_agent}",
+                passed=True,
+                message=f"Correctly routed to '{expected_agent}'",
+                expected=expected_agent,
+                actual=actual,
+            )
+        return AssertionResult(
+            name=f"routed_to:{expected_agent}",
+            passed=False,
+            message=f"Expected routing to '{expected_agent}', but was handled by '{actual or 'unknown'}'",
+            expected=expected_agent,
+            actual=actual,
+        )
+
+    return check
+
+
+def assert_not_routed_to(agent_name: str) -> AssertionFn:
+    """Check that the request was NOT routed to a specific sub-agent.
+
+    Args:
+        agent_name: Name of the sub-agent that should NOT handle the request.
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        actual = response.handled_by
+        if actual != agent_name:
+            return AssertionResult(
+                name=f"not_routed_to:{agent_name}",
+                passed=True,
+                message=f"Correctly not routed to '{agent_name}' (went to '{actual or 'unknown'}')",
+                expected=f"Not {agent_name}",
+                actual=actual,
+            )
+        return AssertionResult(
+            name=f"not_routed_to:{agent_name}",
+            passed=False,
+            message=f"Request should NOT have been routed to '{agent_name}'",
+            expected=f"Not {agent_name}",
+            actual=actual,
+        )
+
+    return check
+
+
+def assert_routing_path(expected_path: List[str]) -> AssertionFn:
+    """Check the full routing chain in a multi-agent orchestrator.
+
+    Args:
+        expected_path: Ordered list of agents in the routing chain,
+                       e.g. ["orchestrator", "flights_agent"]
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        actual_path = response.routing_path
+        if actual_path == expected_path:
+            return AssertionResult(
+                name="routing_path",
+                passed=True,
+                message=f"Routing path matches: {' → '.join(actual_path)}",
+                expected=expected_path,
+                actual=actual_path,
+            )
+        return AssertionResult(
+            name="routing_path",
+            passed=False,
+            message=f"Expected routing path {' → '.join(expected_path)}, got {' → '.join(actual_path) if actual_path else 'empty'}",
+            expected=expected_path,
+            actual=actual_path,
+        )
+
+    return check
+
+
+def assert_routing_path_contains(agent_name: str) -> AssertionFn:
+    """Check that a specific agent appears somewhere in the routing chain.
+
+    Args:
+        agent_name: Agent name that should appear in the routing path.
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        actual_path = response.routing_path
+        if agent_name in actual_path:
+            return AssertionResult(
+                name=f"routing_path_contains:{agent_name}",
+                passed=True,
+                message=f"'{agent_name}' found in routing path: {' → '.join(actual_path)}",
+                expected=agent_name,
+                actual=actual_path,
+            )
+        return AssertionResult(
+            name=f"routing_path_contains:{agent_name}",
+            passed=False,
+            message=f"'{agent_name}' not found in routing path: {' → '.join(actual_path) if actual_path else 'empty'}",
+            expected=agent_name,
+            actual=actual_path,
+        )
+
+    return check
+
+
+# =========================================================================
+# Baseline / Golden Response Assertion
+# =========================================================================
+
+
+def assert_matches_baseline(
+    base_dir: str = "baselines",
+) -> AssertionFn:
+    """Assert that the current response matches the saved baseline.
+
+    Compares response content, tool calls, and routing path against a stored
+    golden snapshot. Use `attest baseline save` to create snapshots first.
+
+    The runner injects _test_name and _agent into response.metadata so
+    this assertion can locate the correct baseline file.
+
+    Args:
+        base_dir: Directory containing baseline JSON files.
+
+    YAML:
+        assertions:
+          - matches_baseline: true
+          - matches_baseline: { base_dir: "my_baselines" }
+    """
+    from pathlib import Path as _Path
+    from attest.utils.baseline import compare_with_baseline
+
+    def _check(response: AgentResponse) -> AssertionResult:
+        from attest.core.models import TestResult, Status, Message
+
+        test_name = response.metadata.get("_test_name", "unknown")
+        agent = response.metadata.get("_agent", "default")
+
+        # Build a lightweight TestResult for comparison
+        result = TestResult(
+            scenario=test_name,
+            agent=agent,
+            messages=[Message(role="assistant", content=response.content)],
+            tool_calls=response.tool_calls,
+            routing_path=response.routing_path,
+        )
+        diff = compare_with_baseline(result, _Path(base_dir))
+        if diff is None:
+            return AssertionResult(
+                name="matches_baseline",
+                passed=True,
+                message="No baseline found — skipping (save with `attest baseline save`).",
+            )
+        return AssertionResult(
+            name="matches_baseline",
+            passed=diff["all_match"],
+            message=diff["details"],
+            expected="matches baseline",
+            actual="changed" if not diff["all_match"] else "matches",
+        )
+
+    return _check
+
+
+# =========================================================================
+# Safety / Quality Assertions (PII, cost, language, semantic similarity)
+# =========================================================================
+
+# Common PII patterns. Deliberately conservative to limit false positives.
+_PII_PATTERNS: Dict[str, str] = {
+    "email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+    "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
+    "credit_card": r"\b(?:\d[ -]*?){13,16}\b",
+    "phone": r"\b(?:\+?\d{1,3}[ -]?)?(?:\(?\d{3}\)?[ -]?)\d{3}[ -]?\d{4}\b",
+    "ip": r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b",
+}
+
+
+def assert_no_pii(types: Optional[List[str]] = None) -> AssertionFn:
+    """Assert that the response contains no personally identifiable information.
+
+    Detects emails, US SSNs, credit-card-like numbers, phone numbers, and IPs
+    via regex. Use this as a safety gate so agents don't leak sensitive data.
+
+    Args:
+        types: PII categories to check. Defaults to all known categories.
+            Valid: "email", "ssn", "credit_card", "phone", "ip".
+
+    YAML:
+        assertions:
+          - no_pii: true
+          - no_pii: ["ssn", "credit_card"]
+    """
+    selected = types or list(_PII_PATTERNS.keys())
+
+    def check(response: AgentResponse) -> AssertionResult:
+        found: Dict[str, List[str]] = {}
+        for kind in selected:
+            pattern = _PII_PATTERNS.get(kind)
+            if not pattern:
+                continue
+            matches = re.findall(pattern, response.content)
+            # credit_card regex is greedy; require digit count to reduce noise
+            if kind == "credit_card":
+                matches = [m for m in matches if len(re.sub(r"\D", "", m)) >= 13]
+            if matches:
+                found[kind] = matches[:3]
+
+        if not found:
+            return AssertionResult(name="no_pii", passed=True)
+
+        summary = ", ".join(f"{k} ({len(v)})" for k, v in found.items())
+        return AssertionResult(
+            name="no_pii",
+            passed=False,
+            message=f"Response contains possible PII: {summary}.",
+            expected="no PII",
+            actual=summary,
+        )
+
+    return check
+
+
+def assert_response_cost_under(
+    max_cost: float,
+    input_per_1k: float = 0.005,
+    output_per_1k: float = 0.015,
+) -> AssertionFn:
+    """Assert that the response's token cost is under a USD threshold.
+
+    Cost is computed from the response's ``token_usage`` using the supplied
+    per-1k-token prices (defaults approximate a mid-tier GPT-4o-class model).
+
+    Args:
+        max_cost: Maximum allowed cost in USD.
+        input_per_1k: Price per 1,000 input tokens (USD).
+        output_per_1k: Price per 1,000 output tokens (USD).
+
+    YAML:
+        assertions:
+          - response_cost_under: 0.05
+          - response_cost_under: { max_cost: 0.05, input_per_1k: 0.0025, output_per_1k: 0.01 }
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        usage = response.token_usage
+        if usage is None:
+            return AssertionResult(
+                name="response_cost_under",
+                passed=True,
+                message="No token usage reported — cannot compute cost; skipping.",
+            )
+        cost = (usage.input_tokens / 1000.0) * input_per_1k + (
+            usage.output_tokens / 1000.0
+        ) * output_per_1k
+        passed = cost <= max_cost
+        return AssertionResult(
+            name="response_cost_under",
+            passed=passed,
+            message=(
+                f"Cost ${cost:.5f} is "
+                f"{'within' if passed else 'over'} budget ${max_cost:.5f}."
+            ),
+            expected=f"<= ${max_cost:.5f}",
+            actual=f"${cost:.5f}",
+        )
+
+    return check
+
+
+def assert_language_is(language: str) -> AssertionFn:
+    """Assert that the response is written in the expected language.
+
+    Uses the optional ``langdetect`` package when available for accurate
+    detection; otherwise falls back to a small heuristic for common languages.
+
+    Args:
+        language: Expected ISO 639-1 language code (e.g. "en", "es", "fr", "de").
+
+    YAML:
+        assertions:
+          - language_is: "en"
+    """
+    target = language.lower().strip()
+
+    def check(response: AgentResponse) -> AssertionResult:
+        text = response.content.strip()
+        if not text:
+            return AssertionResult(
+                name="language_is",
+                passed=False,
+                message="Response is empty — cannot detect language.",
+            )
+
+        detected: Optional[str] = None
+        try:
+            from langdetect import detect  # type: ignore
+
+            detected = detect(text).lower()
+        except Exception:
+            detected = _heuristic_language(text)
+
+        if detected is None:
+            return AssertionResult(
+                name="language_is",
+                passed=True,
+                message="Could not detect language (install 'langdetect' for accuracy); skipping.",
+            )
+
+        passed = detected == target or detected.startswith(target)
+        return AssertionResult(
+            name="language_is",
+            passed=passed,
+            message=f"Detected language '{detected}', expected '{target}'.",
+            expected=target,
+            actual=detected,
+        )
+
+    return check
+
+
+def _heuristic_language(text: str) -> Optional[str]:
+    """Very small fallback language guess based on common stop-words."""
+    lowered = " " + text.lower() + " "
+    markers = {
+        "es": [" el ", " la ", " que ", " de ", " y ", " los ", " para ", " con "],
+        "fr": [" le ", " la ", " les ", " et ", " une ", " des ", " pour ", " avec "],
+        "de": [" der ", " die ", " und ", " das ", " ist ", " nicht ", " mit ", " ein "],
+        "en": [" the ", " and ", " is ", " of ", " to ", " a ", " for ", " with "],
+    }
+    scores = {lang: sum(lowered.count(m) for m in words) for lang, words in markers.items()}
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else None
+
+
+def assert_semantic_match(
+    expected: str,
+    min_similarity: float = 0.8,
+    model: str = "text-embedding-3-small",
+) -> AssertionFn:
+    """Assert that the response is semantically similar to expected text.
+
+    Computes embedding cosine similarity via LiteLLM. If embeddings are not
+    available (no credentials / offline), it gracefully skips (passes with a
+    note) so suites stay runnable in CI without model access.
+
+    Args:
+        expected: The reference answer to compare against.
+        min_similarity: Minimum cosine similarity (0-1) required to pass.
+        model: Embedding model name (LiteLLM-compatible).
+
+    YAML:
+        assertions:
+          - semantic_match: { expected: "A refund will be issued.", min_similarity: 0.85 }
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        try:
+            import litellm
+
+            resp = litellm.embedding(model=model, input=[response.content, expected])
+            vec_a = resp["data"][0]["embedding"]
+            vec_b = resp["data"][1]["embedding"]
+            similarity = _cosine_similarity(vec_a, vec_b)
+        except Exception as e:  # noqa: BLE001
+            return AssertionResult(
+                name="semantic_match",
+                passed=True,
+                message=f"Embeddings unavailable ({type(e).__name__}); skipping semantic check.",
+            )
+
+        passed = similarity >= min_similarity
+        return AssertionResult(
+            name="semantic_match",
+            passed=passed,
+            message=f"Semantic similarity {similarity:.3f} (threshold {min_similarity:.2f}).",
+            expected=f">= {min_similarity:.2f}",
+            actual=f"{similarity:.3f}",
+        )
+
+    return check
+
+
+def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Cosine similarity between two equal-length vectors."""
+    import math
+
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+# =========================================================================
 # YAML Assertion Resolver
 # =========================================================================
 # This translates YAML assertion syntax into assertion functions.
@@ -854,6 +1265,18 @@ def resolve_assertion(assertion_dict: Dict[str, Any]) -> Optional[AssertionFn]:
         "json_array_length": lambda v: assert_json_array_length(v.get("min", 0), v.get("max"), v.get("field", "")),
         # Classification assertion
         "classification": lambda v: assert_classification(v) if isinstance(v, list) else assert_classification(v.get("labels", []), v.get("field", "")),
+        # Multi-agent orchestrator routing assertions
+        "routed_to": lambda v: assert_routed_to(v),
+        "not_routed_to": lambda v: assert_not_routed_to(v),
+        "routing_path": lambda v: assert_routing_path(v),
+        "routing_path_contains": lambda v: assert_routing_path_contains(v),
+        # Baseline / regression assertion
+        "matches_baseline": lambda v: assert_matches_baseline() if isinstance(v, bool) else assert_matches_baseline(v.get("base_dir", "baselines")),
+        # Safety / quality assertions
+        "no_pii": lambda v: assert_no_pii() if isinstance(v, bool) else assert_no_pii(v),
+        "response_cost_under": lambda v: assert_response_cost_under(float(v)) if isinstance(v, (int, float)) else assert_response_cost_under(v.get("max_cost", 0.0), v.get("input_per_1k", 0.005), v.get("output_per_1k", 0.015)),
+        "language_is": lambda v: assert_language_is(v),
+        "semantic_match": lambda v: assert_semantic_match(v.get("expected", ""), v.get("min_similarity", 0.8), v.get("model", "text-embedding-3-small")),
     }
 
     for key, value in assertion_dict.items():

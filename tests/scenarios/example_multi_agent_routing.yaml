@@ -1,0 +1,38 @@
+# ============================================================
+# EXAMPLE — Multi-Agent Routing Tests
+# ============================================================
+# For ORCHESTRATOR agents that delegate each request to the right
+# sub-agent. Verifies the routing decision and the chain.
+#
+# TEMPLATE: requires an orchestrator that reports routing. For an
+# HTTP orchestrator, set response.handled_by_path / routing_path_path
+# in Agent Setup; for in-process graphs use the LangGraph/CrewAI/
+# AutoGen adapter. Point `agent` at your orchestrator.
+# ============================================================
+
+name: "Example · Multi-Agent Routing"
+agent: your_orchestrator   # ← change to your configured orchestrator
+
+tests:
+  - name: routes_flight_request_to_flights_agent
+    input: "Book me a flight from Seattle to Tokyo next Friday."
+    assertions:
+      - response_not_empty: true
+      - routed_to: flights_agent
+      - routing_path_contains: flights_agent
+      - not_routed_to: billing_agent
+    tags: [example, multi_agent, routing]
+
+  - name: routes_hotel_request_through_orchestrator
+    input: "Find me a 4-star hotel in Kyoto for three nights."
+    assertions:
+      - routed_to: hotels_agent
+      - routing_path: [orchestrator, hotels_agent]
+    tags: [example, multi_agent, routing]
+
+  - name: routes_billing_question_to_billing_agent
+    input: "Why was I charged twice for my last booking?"
+    assertions:
+      - routed_to: billing_agent
+      - not_routed_to: flights_agent
+    tags: [example, multi_agent, routing]

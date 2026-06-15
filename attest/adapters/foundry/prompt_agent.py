@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 
 from attest.adapters.base import BaseAgentAdapter
 from attest.core.exceptions import AdapterError
-from attest.core.models import AgentResponse, Message
+from attest.core.models import AgentResponse, Message, ToolCall, TokenUsage
 
 
 class FoundryPromptAgentAdapter(BaseAgentAdapter):
@@ -86,18 +86,11 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
                 self._connected = True
 
             else:
-                # Azure identity auth — tries CLI first, then opens browser
+                # Azure identity auth — tries SP, WIF, Managed Identity, CLI, browser
                 from azure.ai.projects import AIProjectClient
-                from azure.identity import (
-                    ChainedTokenCredential,
-                    AzureCliCredential,
-                    InteractiveBrowserCredential,
-                )
+                from attest.utils.azure_client import get_azure_credential
 
-                credential = ChainedTokenCredential(
-                    AzureCliCredential(),
-                    InteractiveBrowserCredential(),
-                )
+                credential = get_azure_credential()
 
                 project_client = AIProjectClient(
                     endpoint=self._endpoint,
@@ -161,7 +154,52 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
         latency_ms = (time.perf_counter() - start_time) * 1000
         content = response.output_text if hasattr(response, "output_text") else str(response)
 
-        return AgentResponse(content=content, latency_ms=latency_ms)
+        # Extract tool calls from the response output items
+        tool_calls = []
+        try:
+            if hasattr(response, "output") and response.output:
+                for item in response.output:
+                    item_type = getattr(item, "type", None)
+                    if item_type == "function_call":
+                        import json as _json
+                        args = getattr(item, "arguments", "{}")
+                        tool_calls.append(ToolCall(
+                            name=getattr(item, "name", "unknown"),
+                            arguments=_json.loads(args) if isinstance(args, str) else (args or {}),
+                            result=getattr(item, "output", None),
+                        ))
+                    elif item_type == "function_call_output":
+                        # Match output to the last tool call with the same call_id
+                        call_id = getattr(item, "call_id", None)
+                        output_val = getattr(item, "output", None)
+                        if call_id and output_val and tool_calls:
+                            for tc in reversed(tool_calls):
+                                if not tc.result:
+                                    tc.result = output_val
+                                    break
+        except Exception:
+            pass  # Tool call extraction is best-effort
+
+        # Extract token usage
+        token_usage = None
+        try:
+            usage = getattr(response, "usage", None)
+            if usage:
+                token_usage = TokenUsage(
+                    input_tokens=getattr(usage, "input_tokens", 0) or getattr(usage, "prompt_tokens", 0),
+                    output_tokens=getattr(usage, "output_tokens", 0) or getattr(usage, "completion_tokens", 0),
+                    total_tokens=getattr(usage, "total_tokens", 0),
+                )
+        except Exception:
+            pass  # Token usage extraction is best-effort
+
+        return AgentResponse(
+            content=content,
+            latency_ms=latency_ms,
+            tool_calls=tool_calls,
+            token_usage=token_usage,
+            raw_response=response,
+        )
 
     async def health_check(self) -> bool:
         """Check if we can connect."""

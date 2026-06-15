@@ -1,13 +1,29 @@
-"""Ragas Plugin (planned).
+"""RAGAS Plugin for ATTEST.
 
-Will wrap Ragas evaluation metrics into ATTEST's BaseEvaluator interface.
-Ragas specializes in RAG pipeline evaluation.
+Provides RAG-focused evaluation metrics from the RAGAS framework.
+Uses 'ragas_' prefix to distinguish from built-in evaluators.
 
-Install: pip install ragas
+Install: pip install ragas langchain-openai
 
-For now, use DeepEval's RAG metrics instead:
-    - deepeval_contextual_relevancy
-    - deepeval_contextual_recall
-    - deepeval_contextual_precision
-    - deepeval_faithfulness
+Available metrics:
+    ragas_faithfulness, ragas_answer_relevancy,
+    ragas_context_precision, ragas_context_recall
 """
+
+from attest.plugins.ragas_plugin.evaluators import (
+    RAGAS_EVALUATORS,
+    RagasAnswerRelevancyEvaluator,
+    RagasContextPrecisionEvaluator,
+    RagasContextRecallEvaluator,
+    RagasFaithfulnessEvaluator,
+    register_ragas_evaluators,
+)
+
+__all__ = [
+    "RAGAS_EVALUATORS",
+    "register_ragas_evaluators",
+    "RagasFaithfulnessEvaluator",
+    "RagasAnswerRelevancyEvaluator",
+    "RagasContextPrecisionEvaluator",
+    "RagasContextRecallEvaluator",
+]

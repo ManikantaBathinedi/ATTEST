@@ -2,13 +2,18 @@
 
 This guide takes you from zero to running your first agent test.
 
+> **Just want to look around first?** After installing (Steps 1–3), run
+> `attest examples --run` to execute the bundled offline examples, or `attest serve` to open
+> the dashboard — it comes pre-loaded with **sample results for every test type**, so you can
+> explore without configuring an agent. Then come back here to test your own agent.
+
 ---
 
 ## Step 1: Get the Code
 
 ```bash
-git clone <your-repo-url>
-cd attest
+git clone https://github.com/ManikantaBathinedi/ATTEST.git
+cd ATTEST
 ```
 
 ---
@@ -253,9 +258,12 @@ Results are saved to `reports/results.json` automatically.
 | `attest run` | Run all tests |
 | `attest run --suite "name"` | Run one suite |
 | `attest run --tag smoke` | Run by tag |
+| `attest examples` | List the bundled example test suites |
+| `attest examples --run` | Run the offline (mock-agent) examples |
 | `attest serve` | Start web dashboard |
 | `attest serve --port 9090` | Dashboard on custom port |
 | `attest serve --no-open` | Don't auto-open browser |
+| `attest ci --provider github` | Scaffold a CI workflow (github or azure) |
 | `attest test-connection` | Verify agent is reachable |
 | `attest version` | Show version |
 

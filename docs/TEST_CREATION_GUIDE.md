@@ -2,6 +2,10 @@
 
 Everything you need to know about creating tests in ATTEST. Covers all test types, all creation methods, and real-world examples.
 
+> **Fastest way to learn:** every test type below has a ready-made example in
+> [`tests/scenarios/example_*.yaml`](../tests/scenarios/). Run `attest examples` to list them,
+> then copy one and adapt it to your agent.
+
 ---
 
 ## Test Types Overview
@@ -9,9 +13,14 @@ Everything you need to know about creating tests in ATTEST. Covers all test type
 | Type | What it does | Best for |
 |------|-------------|----------|
 | **Single Turn** | Send one message → check response | Factual questions, safety, tool use, JSON output |
+| **Tool Call** | Verify which tools were called, with what args, in what order | Function-calling agents |
+| **RAG / Grounding** | Check the response is grounded in provided context | Retrieval-augmented agents |
+| **JSON / Structured Output** | Validate JSON shape, fields, schema, classification | API-style / structured agents |
 | **Multi-Turn Conversation** | Send a scripted sequence of messages | Booking flows, multi-step tasks, context retention |
 | **User Simulation** | LLM plays a realistic user persona | Stress testing, edge cases, customer scenarios |
 | **Security / Red Team** | 30 pre-built attack patterns | Prompt injection, jailbreak, PII extraction, bias |
+| **Safety (Evaluator-based)** | Score responses for toxicity, bias, harm | Content safety gates |
+| **Multi-Agent Routing** | Verify an orchestrator delegates to the right sub-agent | Router/orchestrator agents, multi-agent systems |
 
 ---
 
@@ -345,6 +354,60 @@ tests:
 
 ---
 
+## 9. Multi-Agent Routing Tests
+
+For **orchestrator** agents that delegate each request to the right sub-agent (e.g. a
+travel orchestrator routing to `flights_agent`, `hotels_agent`, or `billing_agent`).
+
+**Prerequisite:** the agent must report its routing. Two ways:
+- **HTTP orchestrator** — in Agent Setup (or `attest.yaml`), set the response paths so ATTEST
+  can read them from the JSON response:
+  ```yaml
+  agents:
+    travel_orchestrator:
+      type: http
+      endpoint: "https://your-orchestrator.example.com"
+      request: { path: "/chat" }
+      response:
+        content_path: "$.reply"
+        handled_by_path: "$.handled_by"       # e.g. "flights_agent"
+        routing_path_path: "$.routing_path"   # e.g. ["orchestrator","flights_agent"]
+  ```
+- **In-process graph** — use a LangGraph / CrewAI / AutoGen adapter; the graph's execution
+  populates `handled_by` / `routing_path` automatically.
+
+### YAML Example
+```yaml
+name: "Multi-Agent Orchestrator Routing"
+agent: travel_orchestrator
+tests:
+  - name: routes_flight_request
+    input: "Book me a flight from Seattle to Tokyo next Friday."
+    assertions:
+      - response_not_empty: true
+      - routed_to: flights_agent              # final sub-agent
+      - routing_path_contains: flights_agent  # appears in the chain
+      - not_routed_to: billing_agent          # must NOT be used
+    tags: [multi_agent, routing]
+
+  - name: routes_hotel_request
+    input: "Find me a 4-star hotel in Kyoto for three nights."
+    assertions:
+      - routed_to: hotels_agent
+      - routing_path: [orchestrator, hotels_agent]   # exact ordered chain
+    tags: [multi_agent, routing]
+```
+
+> The dashboard shows the **🔀 Routing Path** (`orchestrator → flights_agent`) and which
+> sub-agent **handled** each request in the expanded result detail. A ready-to-edit suite
+> lives at [tests/scenarios/example_multi_agent_routing.yaml](../tests/scenarios/example_multi_agent_routing.yaml).
+>
+> **Note:** this validates the *routing decision* and the *final output* — not each sub-agent's
+> individual intermediate step. To test a step in isolation, register it as its own agent and
+> write focused single-turn tests against it.
+
+---
+
 ## Creation Methods Summary
 
 | Method | Best for | Supports |
@@ -359,7 +422,7 @@ tests:
 
 ---
 
-## All 23 Assertions Reference
+## All 32 Assertions Reference
 
 ### Response Content (6)
 | YAML Key | Example | Description |
@@ -394,6 +457,32 @@ tests:
 | `json_array_length` | `{min: 1, max: 10, field: "items"}` | Array size |
 | `classification` | `["pos", "neg", "neutral"]` | Label is one-of |
 
+### Multi-Agent Routing (4)
+For **orchestrators** that delegate to sub-agents. Requires the agent to report routing
+(an HTTP agent with `handled_by` / `routing_path` configured in Agent Setup, or an
+in-process graph adapter such as LangGraph/CrewAI/AutoGen). See
+[example_multi_agent_routing.yaml](../tests/scenarios/example_multi_agent_routing.yaml).
+
+| YAML Key | Example | Description |
+|----------|---------|-------------|
+| `routed_to: "name"` | `routed_to: flights_agent` | The sub-agent that handled the request |
+| `not_routed_to: "name"` | `not_routed_to: billing_agent` | A sub-agent that must NOT handle it |
+| `routing_path: [...]` | `routing_path: [orchestrator, flights_agent]` | The exact ordered routing chain |
+| `routing_path_contains: "name"` | `routing_path_contains: orchestrator` | An agent that must appear in the chain |
+
+### Safety & Quality (4)
+| YAML Key | Example | Description |
+|----------|---------|-------------|
+| `no_pii: true` | `no_pii: [ssn, credit_card]` | No PII leaked (all types, or a subset) |
+| `response_cost_under` | `response_cost_under: 0.05` | Token cost under N USD |
+| `language_is: "code"` | `language_is: en` | Response is in the expected language |
+| `semantic_match` | `{expected: "ref answer", min_similarity: 0.8}` | Embedding similarity to a reference (needs API key) |
+
+### Regression / Baseline (1)
+| YAML Key | Example | Description |
+|----------|---------|-------------|
+| `matches_baseline: true` | `{base_dir: "baselines"}` | Matches the saved golden response |
+
 ### Performance (2)
 | YAML Key | Example | Description |
 |----------|---------|-------------|
@@ -402,7 +491,7 @@ tests:
 
 ---
 
-## All 32 Evaluators Reference
+## All 36 Evaluators Reference
 
 ### Built-in (5) — Always available, uses your configured LLM judge
 `correctness` · `relevancy` · `hallucination` · `completeness` · `tone`
@@ -424,6 +513,9 @@ tests:
 **Safety**: `violence` · `sexual` · `self_harm` · `hate_unfairness`
 
 **NLP**: `f1_score` · `bleu_score`
+
+### RAGAS (4) — `pip install ragas langchain-openai`
+**RAG**: `ragas_faithfulness` · `ragas_answer_relevancy` · `ragas_context_precision` · `ragas_context_recall`
 
 ### Custom Thresholds
 ```yaml

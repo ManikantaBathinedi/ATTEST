@@ -1,0 +1,24 @@
+# ============================================================
+# EXAMPLE — User Simulation Tests
+# ============================================================
+# An LLM plays a realistic user persona and pursues a goal across
+# multiple turns. Great for finding edge cases.
+#
+# TEMPLATE: simulation needs an LLM (API key) to drive the persona,
+# so it does not run against the offline mock. Point `agent` at your
+# real agent and set your key in Settings to run this for real.
+# ============================================================
+
+name: "Example · User Simulation"
+agent: your_agent          # ← change to your configured agent
+
+tests:
+  - name: frustrated_customer
+    type: simulation
+    persona: "A frustrated customer who received a damaged laptop and wants a full refund and a prepaid return label."
+    input: "Get a full refund and a prepaid return shipping label."
+    max_turns: 6
+    evaluators:
+      - relevancy
+      - tone
+    tags: [example, simulation]

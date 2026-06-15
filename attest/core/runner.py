@@ -4,7 +4,7 @@ The runner takes a list of TestCases and for each one:
 1. Picks the right adapter based on agent name in config
 2. Sends the input message to the agent
 3. Runs deterministic assertions (instant, free)
-4. Runs LLM evaluators (async, costs tokens)
+4. Runs LLM evaluators only if assertions pass (cost optimization)
 5. Determines pass/fail
 6. Collects everything into a TestResult
 7. Aggregates all results into a RunSummary
@@ -19,10 +19,11 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -43,6 +44,9 @@ from attest.core.models import (
 )
 from attest.evaluation.interface import EvaluationInput
 from attest.evaluation.registry import EvaluatorRegistry
+from attest.utils.response_cache import ResponseCache
+from attest.utils.rate_limiter import RateLimiter
+from attest.utils.tracing import span, set_span_attr
 
 console = Console()
 
@@ -64,6 +68,12 @@ class TestRunner:
             model=config.evaluation.judge.model
         )
         self._adapters: Dict[str, BaseAgentAdapter] = {}
+        self._cache = ResponseCache() if config.evaluation.cost.cache_responses else None
+        self._rate_limiter = (
+            RateLimiter(requests_per_second=config.evaluation.cost.rate_limit)
+            if config.evaluation.cost.rate_limit > 0
+            else None
+        )
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -73,12 +83,20 @@ class TestRunner:
         self,
         test_cases: List[TestCase],
         verbose: bool = True,
+        parallel: int = 1,
+        should_cancel: Optional[Callable[[], bool]] = None,
+        on_result: Optional[Callable[[TestCase, TestResult], None]] = None,
     ) -> RunSummary:
         """Run all test cases and return aggregated results.
 
         Args:
             test_cases: List of tests to run.
             verbose: Print progress to console.
+            parallel: Max concurrent tests. 1 = sequential (default).
+            should_cancel: Optional callback polled before each test. If it
+                returns True, remaining tests are skipped and the run stops.
+            on_result: Optional callback invoked after each test completes,
+                with (test_case, result). Useful for live progress updates.
 
         Returns:
             RunSummary with all results and aggregate stats.
@@ -89,28 +107,62 @@ class TestRunner:
         start_time = time.perf_counter()
 
         if verbose:
-            console.print(f"\n[bold]ATTEST[/bold] — Running {len(test_cases)} test(s)\n")
+            mode = f"parallel ({parallel} workers)" if parallel > 1 else "sequential"
+            console.print(f"\n[bold]ATTEST[/bold] — Running {len(test_cases)} test(s) [{mode}]\n")
 
         # Setup adapters
         await self._setup_adapters(test_cases)
 
         try:
-            for i, test_case in enumerate(test_cases, 1):
-                if verbose:
-                    with console.status(
-                        f"  [{i}/{len(test_cases)}] {test_case.name}...",
-                        spinner="dots",
-                    ):
-                        result = await self._run_single(test_case)
-                    # Print result on same line after spinner clears
-                    console.print(
-                        f"  [{i}/{len(test_cases)}] {test_case.name}...", end=" "
-                    )
-                    self._print_result(result)
-                else:
-                    result = await self._run_single(test_case)
+            if parallel > 1:
+                # Parallel execution with bounded concurrency
+                semaphore = asyncio.Semaphore(parallel)
+                counter = {"done": 0}
+                total = len(test_cases)
 
-                summary.add_result(result)
+                async def _run_with_limit(tc: TestCase) -> Optional[TestResult]:
+                    async with semaphore:
+                        # Honor cancellation: skip queued tests once requested.
+                        if should_cancel and should_cancel():
+                            return None
+                        result = await self._run_single(tc)
+                        counter["done"] += 1
+                        if verbose:
+                            console.print(
+                                f"  [{counter['done']}/{total}] {tc.name}...", end=" "
+                            )
+                            self._print_result(result)
+                        if on_result:
+                            on_result(tc, result)
+                        return result
+
+                results = await asyncio.gather(
+                    *[_run_with_limit(tc) for tc in test_cases]
+                )
+                for result in results:
+                    if result is not None:
+                        summary.add_result(result)
+            else:
+                # Sequential execution (original behavior)
+                for i, test_case in enumerate(test_cases, 1):
+                    if should_cancel and should_cancel():
+                        break
+                    if verbose:
+                        with console.status(
+                            f"  [{i}/{len(test_cases)}] {test_case.name}...",
+                            spinner="dots",
+                        ):
+                            result = await self._run_single(test_case)
+                        console.print(
+                            f"  [{i}/{len(test_cases)}] {test_case.name}...", end=" "
+                        )
+                        self._print_result(result)
+                    else:
+                        result = await self._run_single(test_case)
+
+                    summary.add_result(result)
+                    if on_result:
+                        on_result(test_case, result)
 
         finally:
             # Always cleanup adapters
@@ -121,6 +173,10 @@ class TestRunner:
         if verbose:
             self._print_summary(summary)
 
+        # Upload to Foundry portal if configured
+        if self._config.reporting.foundry_upload:
+            await self._upload_to_foundry(summary, verbose)
+
         return summary
 
     # ------------------------------------------------------------------
@@ -129,6 +185,33 @@ class TestRunner:
 
     async def _run_single(self, test_case: TestCase) -> TestResult:
         """Run a single test case through the full pipeline."""
+        with span("attest.test_case", {
+            "attest.scenario": test_case.name,
+            "attest.suite": test_case.suite,
+            "attest.agent": test_case.agent,
+            "attest.type": test_case.type,
+        }) as s:
+            result = await self._run_single_dispatch(test_case)
+            # Record the real configured agent name (e.g. "travel_agent")
+            # rather than the placeholder "default" used by scenario files
+            # that omit an explicit agent.
+            result.agent = self._resolve_agent_name(result.agent)
+            set_span_attr(s, "attest.status", result.status.value)
+            set_span_attr(s, "attest.latency_ms", round(result.latency_ms))
+            if result.error:
+                set_span_attr(s, "attest.error", result.error)
+            return result
+
+    async def _run_single_dispatch(self, test_case: TestCase) -> TestResult:
+        """Pick the right runner for this test case's type."""
+        # Reset conversation state between tests to prevent leakage
+        adapter = self._get_adapter(test_case.agent)
+        if adapter:
+            try:
+                await adapter.reset_conversation()
+            except Exception:
+                pass  # Best-effort reset — don't fail the test
+
         # Route to conversation runner if it's a multi-turn test
         if test_case.type == "conversation" and test_case.conversation_script:
             return await self._run_conversation(test_case)
@@ -268,6 +351,25 @@ class TestRunner:
                 )
             )
 
+            # Run the configured deterministic assertions against the simulated
+            # conversation. Content assertions (contains, no_pii, language, etc.)
+            # check across everything the agent said; the last turn carries tool
+            # calls for tool-call assertions.
+            if test_case.assertions and sim_result.turns:
+                last_turn = sim_result.turns[-1]
+                combined_agent_text = "\n".join(
+                    t.agent_response for t in sim_result.turns if t.agent_response
+                )
+                sim_response = AgentResponse(
+                    content=combined_agent_text or last_turn.agent_response,
+                    tool_calls=getattr(last_turn, "tool_calls", []) or [],
+                    latency_ms=sim_result.total_latency_ms,
+                )
+                sim_response.metadata["_test_name"] = test_case.name
+                sim_response.metadata["_agent"] = test_case.agent
+                assertion_fns = resolve_assertions(test_case.assertions)
+                result.assertions.extend(run_assertions(sim_response, assertion_fns))
+
             # Run evaluators on the full conversation
             if test_case.evaluators and sim_result.turns:
                 last_turn = sim_result.turns[-1]
@@ -288,8 +390,9 @@ class TestRunner:
 
             # Determine status
             goal_ok = sim_result.goal_achieved
+            asserts_ok = all(a.passed for a in result.assertions) if result.assertions else True
             evals_ok = all(s.passed for s in result.scores.values()) if result.scores else True
-            result.status = Status.PASSED if (goal_ok and evals_ok) else Status.FAILED
+            result.status = Status.PASSED if (goal_ok and asserts_ok and evals_ok) else Status.FAILED
 
         except Exception as e:
             result.status = Status.ERROR
@@ -305,7 +408,7 @@ class TestRunner:
             1. Get adapter for the agent
             2. Send message → AgentResponse
             3. Run assertions → AssertionResult[]
-            4. Run evaluators → EvalScore[]
+            4. Run evaluators (skipped if assertions fail — cost optimization)
             5. Determine status (pass/fail)
             6. Build TestResult
         """
@@ -324,17 +427,47 @@ class TestRunner:
             result.error = f"No adapter found for agent '{test_case.agent}'"
             return result
 
-        # Step 2: Send message to agent
-        try:
-            response = await adapter.send_message(
-                message=test_case.input,
-                conversation_history=test_case.conversation_history or None,
-            )
-        except AdapterError as e:
-            result.status = Status.ERROR
-            result.error = str(e)
-            result.duration_ms = (time.perf_counter() - start_time) * 1000
-            return result
+        # Step 2: Send message to agent (with cache, timeout + retries)
+        # Check cache first
+        history = test_case.conversation_history or None
+        cached = self._cache.get(test_case.agent, test_case.input, history) if self._cache else None
+
+        if cached is not None:
+            response = cached
+        else:
+            max_attempts = max(1, (test_case.retries or 0) + 1)
+            timeout_seconds = test_case.timeout or 30
+            response = None
+            last_error = None
+
+            for attempt in range(max_attempts):
+                try:
+                    # Rate limiting — throttle parallel requests
+                    if self._rate_limiter:
+                        await self._rate_limiter.acquire()
+
+                    response = await asyncio.wait_for(
+                        adapter.send_message(
+                            message=test_case.input,
+                            conversation_history=history,
+                        ),
+                        timeout=timeout_seconds,
+                    )
+                    break  # Success — exit retry loop
+                except asyncio.TimeoutError:
+                    last_error = f"Agent did not respond within {timeout_seconds}s (attempt {attempt + 1}/{max_attempts})"
+                except AdapterError as e:
+                    last_error = str(e)
+
+            if response is None:
+                result.status = Status.ERROR
+                result.error = last_error
+                result.duration_ms = (time.perf_counter() - start_time) * 1000
+                return result
+
+            # Store in cache for future hits
+            if self._cache:
+                self._cache.put(test_case.agent, test_case.input, response, history)
 
         # Record the conversation
         result.messages = [
@@ -345,15 +478,36 @@ class TestRunner:
         result.latency_ms = response.latency_ms
         result.token_usage = response.token_usage
 
+        # Track multi-agent routing info
+        result.handled_by = response.handled_by
+        result.routing_path = response.routing_path
+
         # Step 3: Run deterministic assertions (instant, free)
         if test_case.assertions:
+            # Inject test identity into metadata for baseline assertions
+            response.metadata["_test_name"] = test_case.name
+            response.metadata["_agent"] = test_case.agent
             assertion_fns = resolve_assertions(test_case.assertions)
             result.assertions = run_assertions(response, assertion_fns)
 
         # Step 4: Run LLM evaluators (async, costs tokens)
-        if test_case.evaluators:
+        # Cost optimization: skip expensive LLM evaluators if assertions already failed
+        assertions_passed = not result.assertions or all(a.passed for a in result.assertions)
+        if test_case.evaluators and assertions_passed:
             eval_scores = await self._run_evaluators(test_case, response)
             result.scores = {s.name: s for s in eval_scores}
+        elif test_case.evaluators and not assertions_passed:
+            # Record skipped evaluators — saves LLM tokens
+            for eval_spec in test_case.evaluators:
+                eval_name = eval_spec if isinstance(eval_spec, str) else next(iter(eval_spec))
+                result.scores[eval_name] = EvalScore(
+                    name=eval_name,
+                    score=0.0,
+                    passed=False,
+                    threshold=0.7,
+                    reason="Skipped — deterministic assertions failed (cost optimization)",
+                    backend="skipped",
+                )
 
         # Step 5: Determine overall status
         result.status = self._determine_status(result)
@@ -522,6 +676,20 @@ class TestRunner:
 
         return None
 
+    def _resolve_agent_name(self, agent_name: str) -> str:
+        """Resolve a logical agent name to the real configured agent name.
+
+        Scenario files that omit an ``agent:`` field fall back to the literal
+        ``"default"``. When there is no agent literally named ``default``, that
+        resolves to the first agent in config — so report the real name (e.g.
+        ``travel_agent``) instead of the placeholder ``default``.
+        """
+        if agent_name in self._config.agents:
+            return agent_name
+        if agent_name == "default" and self._config.agents:
+            return next(iter(self._config.agents))
+        return agent_name
+
     async def _setup_adapters(self, test_cases: List[TestCase]) -> None:
         """Create and setup adapters for all agents used in the test cases."""
         # Find all unique agent names
@@ -563,6 +731,41 @@ class TestRunner:
                     await adapter.teardown()
                 except Exception:
                     pass
+
+    # ------------------------------------------------------------------
+    # Foundry portal upload
+    # ------------------------------------------------------------------
+
+    async def _upload_to_foundry(self, summary: RunSummary, verbose: bool = True) -> None:
+        """Upload test results to Azure Foundry portal."""
+        # Find a Foundry agent endpoint to use for upload
+        foundry_endpoint = None
+        for agent_config in self._config.agents.values():
+            if agent_config.type == "foundry_prompt" and agent_config.endpoint:
+                foundry_endpoint = agent_config.endpoint
+                break
+
+        if not foundry_endpoint:
+            if verbose:
+                console.print("  [yellow]⚠ Foundry upload skipped — no Foundry agent endpoint configured[/yellow]")
+            return
+
+        try:
+            from attest.adapters.foundry.result_uploader import FoundryResultUploader
+
+            uploader = FoundryResultUploader(endpoint=foundry_endpoint)
+            result = await uploader.upload_run(summary)
+            await uploader.close()
+
+            if verbose:
+                status = result.get("status", "unknown")
+                if status in ("uploaded", "success"):
+                    console.print(f"  [green]☁ Results uploaded to Foundry portal[/green]")
+                else:
+                    console.print(f"  [yellow]⚠ Foundry upload: {status}[/yellow]")
+        except Exception as e:
+            if verbose:
+                console.print(f"  [yellow]⚠ Foundry upload failed: {e}[/yellow]")
 
     # ------------------------------------------------------------------
     # Console output
@@ -614,5 +817,12 @@ class TestRunner:
         table.add_row("Overall Score", f"{summary.overall_score:.2f}")
         table.add_row("Duration", f"{summary.duration_seconds:.1f}s")
         table.add_row("Est. Cost", f"${summary.total_cost:.4f}")
+
+        # Show cache stats if caching is enabled
+        if self._cache and self._cache.hits > 0:
+            table.add_row(
+                "Cache",
+                f"{self._cache.hits} hits / {self._cache.misses} misses",
+            )
 
         console.print(table)

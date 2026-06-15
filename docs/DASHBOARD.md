@@ -8,21 +8,35 @@ The ATTEST dashboard is a single-page web app (FastAPI + embedded HTML/CSS/JS) t
 
 **Start:** `attest serve` or `attest serve --no-open`
 
+> **First time?** The dashboard opens pre-loaded with **sample results for every test type**, so
+> no page is ever empty. Read the **Help & About** page (bottom of the sidebar) for a 4-step
+> getting-started walkthrough, then clear the demo data from **Settings → Demo & Example Data**
+> whenever you want a clean slate.
+
 ## Pages
 
+The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, with
+**Settings** and **Help & About** pinned at the bottom.
+
 ### 1. Dashboard (Home)
-- Summary cards: Total Tests, Passed, Failed, Pass Rate, Duration
-- Run All Tests button
+- Time-based welcome header with **Run All Tests** / **Stop** buttons
+- Workspace overview cards: Agents, Test Cases, Suites, Runs Logged (each clickable)
+- **Latest Run** summary cards: Total, Passed, Failed, Errors, Pass Rate, Duration, Total Cost
 - Latest results table with agent name, scores, latency
 
-### 2. Agent Connections
-- List all configured agents with type badge (Foundry/HTTP)
-- Add/Edit/Delete agents
-- Test Connection per agent (shows latency + response preview)
+### 2. Agent Connections (Agent Setup)
+- List all configured agents with a type badge (Foundry / HTTP / MCP)
+- Add/Edit/Delete agents; Test Connection per agent (shows latency + response preview)
+- Agent types: Azure Foundry, HTTP/REST, MCP server, or "Other framework" (code-only adapters)
+- HTTP agents include an optional **🔀 Multi-agent routing** section (`handled_by` /
+  `routing_path` JSONPaths) for orchestrators
 - Saves to `attest.yaml`
 
 ### 3. Test Cases
-- **Create Test**: Form with test name, suite selector, input, expected output, test type (single-turn / multi-turn / user simulation), assertions checkboxes, 32 evaluators across 3 backends with status badges, tags input
+- **Create Test**: Form with test name, suite selector, input, expected output, context, test
+  type (single-turn / multi-turn / user simulation), assertion cards (Response Checks, Safety &
+  Quality, Tool Call, **🔀 Multi-Agent Routing**, Structured Output / JSON), 36 evaluators across
+  4 backends with status badges, and tags input
 - **Upload**: Download CSV/JSONL templates, upload bulk test cases, auto-creates YAML suite files
 - **All Tests**: Table view with name, suite, type, input, tags, assertions, evaluators
 
@@ -33,18 +47,29 @@ The ATTEST dashboard is a single-page web app (FastAPI + embedded HTML/CSS/JS) t
 
 ### 5. Run Tests
 - **Agent override**: Dropdown to run all tests with a different agent
-- **Run by Tag**: Quick-run buttons for each tag
+- **Parallel** workers + **Profile** selector
+- **Run by Tag**: Expandable tag-suite cards, each with its own ▶ Run Suite button
 - **File suites**: Expandable with individual test run buttons
+- **Run All Tests** + **Stop** (cancel a run in progress)
 
 ### 6. Results
 - **Filters**: By agent, by status (passed/failed/error)
-- **Score badges**: Color-coded with backend indicators (🧪 DeepEval, ☁️ Azure)
-- **Expandable details**: Conversation trace, score progress bars, assertion details
-- **Run History / Clear Results / Download Report**
+- **Score badges**: Compact "X.XX avg · N/M ✓" pill; full per-evaluator grid in the detail
+- **Expandable details**: Evaluation scores, assertions, **🔀 routing path & handled-by**, tool
+  calls, token usage/cost, and the full conversation trace
+- **Run History**, **Compare Runs** (run-vs-run diff), **Clear Results**, **HTML Report**, **Export CSV**
 
-### 7. Settings
-- API key management with show/hide toggle
-- Configuration display
+### 7. Baselines
+- Save golden response snapshots; compare current responses against them (regression diff)
+- Shows content / tool-call / routing changes per scenario
+
+### 8. Settings
+- API key management with show/hide toggle (Azure + OpenAI)
+- Execution & cost settings (caching, rate limit, max eval cost, Foundry upload)
+- Current configuration display + evaluator backend status
+
+### 9. Help & About
+- Getting Started (4-step guide), "What is ATTEST", capability cards, and key concepts
 
 ## API Reference
 

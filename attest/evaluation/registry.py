@@ -45,19 +45,31 @@ class EvaluatorRegistry:
             "tone": ToneEvaluator,
         }
 
-        # Auto-register DeepEval evaluators if installed
+        # Auto-register DeepEval evaluators — only if the package is importable.
+        # (The plugin module itself imports deepeval lazily inside methods, so we
+        # must check the actual package here, not rely on the plugin import.)
         try:
+            import deepeval  # noqa: F401
             from attest.plugins.deepeval_plugin.evaluators import register_deepeval_evaluators
             register_deepeval_evaluators(self)
         except ImportError:
             pass  # deepeval not installed — skip
 
-        # Auto-register Azure evaluators if SDK installed
+        # Auto-register Azure evaluators — only if the SDK is importable.
         try:
+            import azure.ai.evaluation  # noqa: F401
             from attest.plugins.azure_eval.evaluators import register_azure_evaluators
             register_azure_evaluators(self)
         except ImportError:
             pass  # azure-ai-evaluation not installed — skip
+
+        # Auto-register RAGAS evaluators if installed
+        try:
+            import ragas  # noqa: F401  (gate: only register if RAGAS is available)
+            from attest.plugins.ragas_plugin.evaluators import register_ragas_evaluators
+            register_ragas_evaluators(self)
+        except ImportError:
+            pass  # ragas not installed — skip
 
     def get(
         self,

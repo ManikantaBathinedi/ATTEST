@@ -1,0 +1,26 @@
+# ============================================================
+# EXAMPLE — JSON / Structured Output Tests
+# ============================================================
+# Verify the agent returns valid, well-shaped JSON.
+# Runs offline: the mock_agent replies with a JSON object when the
+# input mentions "json".
+# ============================================================
+
+name: "Example · JSON Output"
+agent: mock_agent
+
+tests:
+  - name: returns_valid_json
+    input: "Give me a trip plan as JSON."
+    assertions:
+      - response_is_json: true
+      - json_field_exists: ["destination", "days"]
+      - json_field: { path: "destination", value: "Tokyo" }
+    tags: [example, json]
+
+  - name: json_field_types
+    input: "Return it as json, please."
+    assertions:
+      - response_is_json: true
+      - json_field: { path: "days", value: 3 }
+    tags: [example, json]

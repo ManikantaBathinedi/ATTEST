@@ -5,125 +5,193 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATTEST Dashboard</title>
     <style>
+        :root {
+            --bg:#0b1220; --bg-soft:#0f172a; --panel:#161f33; --panel-2:#1c2740;
+            --border:#27324a; --border-soft:#1e2840;
+            --text:#e8edf6; --text-dim:#9aa7bd; --text-mute:#6b7894;
+            --accent:#4f8cff; --accent-2:#6366f1; --accent-hover:#3b7bff;
+            --green:#34d399; --red:#f87171; --amber:#fbbf24; --cyan:#22d3ee;
+            --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+            --shadow-lg:0 4px 12px rgba(0,0,0,.35),0 24px 48px -20px rgba(0,0,0,.6);
+        }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#0f172a; color:#e2e8f0; }
-        .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background:#1e293b; padding:20px; border-right:1px solid #334155; overflow-y:auto; }
-        .main { margin-left:220px; padding:30px; min-height:100vh; }
-        .logo { font-size:20px; font-weight:bold; color:#f8fafc; margin-bottom:30px; }
-        .logo span { color:#3b82f6; }
-        .nav-item { display:block; padding:10px 14px; border-radius:8px; color:#94a3b8; cursor:pointer; margin-bottom:4px; font-size:14px; }
-        .nav-item:hover,.nav-item.active { background:#334155; color:#f8fafc; }
-        .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:25px; }
-        .card { background:#1e293b; border-radius:10px; padding:18px; text-align:center; }
-        .card .value { font-size:28px; font-weight:bold; }
-        .card .label { font-size:12px; color:#94a3b8; margin-top:4px; }
-        .section { background:#1e293b; border-radius:10px; padding:20px; margin-bottom:20px; }
-        .section h2 { font-size:16px; margin-bottom:15px; color:#f8fafc; }
-        .btn { padding:10px 20px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
-        .btn-primary { background:#3b82f6; color:white; }
-        .btn-primary:hover { background:#2563eb; }
-        .btn-primary:disabled { background:#475569; cursor:wait; }
-        .btn-success { background:#22c55e; color:white; }
-        .btn-danger { background:#ef4444; color:white; }
-        .btn-outline { background:transparent; border:1px solid #475569; color:#94a3b8; }
-        .btn-outline:hover { border-color:#94a3b8; color:#f8fafc; }
-        .btn-sm { padding:6px 12px; font-size:12px; }
-        input,select,textarea { background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:10px 14px; border-radius:8px; font-size:14px; width:100%; margin-bottom:12px; font-family:inherit; }
-        input:focus,select:focus,textarea:focus { outline:none; border-color:#3b82f6; }
-        label { display:block; font-size:13px; color:#94a3b8; margin-bottom:4px; }
+        body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:radial-gradient(1200px 700px at 80% -10%,#16203a 0%,var(--bg) 55%); color:var(--text); -webkit-font-smoothing:antialiased; letter-spacing:.01em; }
+        ::selection { background:rgba(79,140,255,.3); }
+        ::-webkit-scrollbar { width:10px; height:10px; }
+        ::-webkit-scrollbar-thumb { background:#2a3650; border-radius:6px; border:2px solid transparent; background-clip:padding-box; }
+        ::-webkit-scrollbar-thumb:hover { background:#384866; background-clip:padding-box; }
+        .sidebar { position:fixed; left:0; top:0; bottom:0; width:232px; background:linear-gradient(180deg,#141d30 0%,#101725 100%); padding:18px 14px; border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
+        .main { margin-left:232px; padding:32px 36px; min-height:100vh; max-width:1500px; }
+        .logo { font-size:19px; font-weight:800; color:#f8fafc; margin:4px 8px 24px; letter-spacing:.02em; display:flex; align-items:center; gap:9px; }
+        .logo .mark { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:#fff; box-shadow:0 4px 14px -2px rgba(79,140,255,.5); }
+        .logo span { background:linear-gradient(90deg,#cfe0ff,#93b4ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+        .logo .tag { font-size:9px; font-weight:600; color:var(--text-mute); letter-spacing:.14em; text-transform:uppercase; margin-top:2px; }
+        .nav-item { display:flex; align-items:center; gap:10px; padding:9px 13px; border-radius:9px; color:var(--text-dim); cursor:pointer; margin-bottom:2px; font-size:13.5px; font-weight:500; position:relative; transition:background .14s,color .14s; text-decoration:none; }
+        .nav-item:hover { background:rgba(255,255,255,.04); color:var(--text); }
+        .nav-item.active { background:linear-gradient(90deg,rgba(79,140,255,.16),rgba(99,102,241,.08)); color:#fff; }
+        .nav-item.active::before { content:''; position:absolute; left:-14px; top:8px; bottom:8px; width:3px; border-radius:0 3px 3px 0; background:linear-gradient(180deg,var(--accent),var(--accent-2)); }
+        .nav-section { font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-mute); margin:16px 0 6px 13px; font-weight:700; }
+        .nav-bottom { margin-top:auto; padding-top:12px; border-top:1px solid var(--border-soft); }
+        .gs-step { display:flex; gap:12px; align-items:flex-start; background:var(--bg-soft); border:1px solid var(--border); border-radius:11px; padding:14px; cursor:pointer; transition:border-color .15s,transform .15s,box-shadow .15s; }
+        .gs-step:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:var(--shadow); }
+        .gs-num { flex:none; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:white; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px -2px rgba(79,140,255,.5); }
+        .gs-title { font-size:13.5px; font-weight:600; color:var(--text); }
+        .gs-desc { font-size:12px; color:var(--text-dim); margin-top:3px; line-height:1.45; }
+        .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:24px; }
+        .card { background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--border); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); transition:transform .15s,border-color .15s; position:relative; overflow:hidden; }
+        .card:hover { transform:translateY(-2px); border-color:#33415e; }
+        .card .value { font-size:27px; font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+        .card .label { font-size:11.5px; color:var(--text-dim); margin-top:5px; font-weight:500; text-transform:uppercase; letter-spacing:.04em; }
+        .section { background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--border); border-radius:14px; padding:22px; margin-bottom:20px; box-shadow:var(--shadow); }
+        .section h2 { font-size:15.5px; margin-bottom:16px; color:#f8fafc; font-weight:700; letter-spacing:-.01em; }
+        .btn { padding:10px 18px; border-radius:9px; border:none; cursor:pointer; font-size:13.5px; font-weight:600; display:inline-flex; align-items:center; gap:7px; transition:background .14s,transform .1s,box-shadow .14s,border-color .14s; }
+        .btn:active { transform:translateY(1px); }
+        .btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:white; box-shadow:0 4px 14px -4px rgba(79,140,255,.6); }
+        .btn-primary:hover { background:linear-gradient(135deg,var(--accent-hover),#5558e6); box-shadow:0 6px 18px -4px rgba(79,140,255,.7); }
+        .btn-primary:disabled { opacity:.6; background:#384866; cursor:wait; box-shadow:none; }
+        .btn-success { background:linear-gradient(135deg,#22c55e,#16a34a); color:white; }
+        .btn-danger { background:linear-gradient(135deg,#ef4444,#dc2626); color:white; }
+        .btn-outline { background:rgba(255,255,255,.02); border:1px solid var(--border); color:var(--text-dim); }
+        .btn-outline:hover { border-color:#3f5170; color:#f8fafc; background:rgba(255,255,255,.05); }
+        .btn-sm { padding:6px 12px; font-size:12px; border-radius:8px; }
+        input,select,textarea { background:var(--bg-soft); border:1px solid var(--border); color:var(--text); padding:10px 13px; border-radius:9px; font-size:13.5px; width:100%; margin-bottom:12px; font-family:inherit; transition:border-color .14s,box-shadow .14s; }
+        input:focus,select:focus,textarea:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,140,255,.15); }
+        label { display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:5px; font-weight:500; }
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
         .form-group { margin-bottom:4px; }
         table { width:100%; border-collapse:collapse; }
-        th { text-align:left; padding:10px 12px; color:#94a3b8; font-size:12px; border-bottom:1px solid #334155; }
-        td { padding:10px 12px; border-bottom:1px solid #1e293b; font-size:14px; }
-        tr:hover { background:rgba(255,255,255,0.03); }
-        .status-pass { color:#22c55e; }
-        .status-fail { color:#ef4444; }
-        .status-error { color:#eab308; }
-        .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
-        .badge-pass { background:#22c55e20; color:#22c55e; }
-        .badge-fail { background:#ef444420; color:#ef4444; }
-        .page { display:none; }
+        .table-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; }
+        .table-wrap table { min-width:640px; }
+        th { text-align:left; padding:11px 13px; color:var(--text-mute); font-size:11px; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:0.05em; font-weight:700; }
+        td { padding:11px 13px; border-bottom:1px solid var(--border-soft); font-size:13px; vertical-align:middle; }
+        tbody tr { transition:background .12s; }
+        tbody tr:hover { background:rgba(79,140,255,.05); }
+        .status-pass { color:var(--green); }
+        .status-fail { color:var(--red); }
+        .status-error { color:var(--amber); }
+        .badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+        .badge-pass { background:#22c55e20; color:var(--green); }
+        .badge-fail { background:#ef444420; color:var(--red); }
+        .page { display:none; animation:fadeIn .25s ease; }
         .page.active { display:block; }
-        h1 { font-size:22px; margin-bottom:20px; }
-        .subtitle { color:#64748b; font-size:13px; margin-bottom:20px; }
-        .alert { padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
-        .alert-success { background:#22c55e15; border:1px solid #22c55e40; color:#22c55e; }
-        .alert-error { background:#ef444415; border:1px solid #ef444440; color:#ef4444; }
-        .alert-info { background:#3b82f615; border:1px solid #3b82f640; color:#3b82f6; }
-        .spinner { display:inline-block; width:16px; height:16px; border:2px solid #475569; border-top-color:#3b82f6; border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+        h1 { font-size:24px; margin-bottom:6px; font-weight:800; letter-spacing:-.02em; color:#f8fafc; }
+        .subtitle { color:var(--text-mute); font-size:13px; margin-bottom:22px; }
+        .alert { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:13px; }
+        .alert-success { background:#22c55e15; border:1px solid #22c55e40; color:var(--green); }
+        .alert-error { background:#ef444415; border:1px solid #ef444440; color:var(--red); }
+        .alert-info { background:#4f8cff15; border:1px solid #4f8cff40; color:var(--accent); }
+        .spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; }
         @keyframes spin { to{transform:rotate(360deg)} }
-        .conv-trace { display:none; padding:12px; background:#0f172a; border-radius:8px; margin:8px 0; }
+        .conv-trace { display:none; padding:14px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:10px; margin:8px 0; }
         .conv-trace.show { display:block; }
-        .msg { padding:8px 12px; margin-bottom:6px; border-radius:6px; font-size:13px; line-height:1.5; }
-        .msg-user { background:#1e3a5f; }
-        .msg-agent { background:#1a2e1a; }
-        .msg-role { font-size:11px; color:#94a3b8; margin-bottom:2px; }
-        .checkbox-group { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
-        .checkbox-group label { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border:1px solid #334155; border-radius:6px; font-size:13px; color:#94a3b8; }
-        .checkbox-group label:hover { border-color:#3b82f6; color:#e2e8f0; }
-        .checkbox-group input[type=checkbox] { width:auto; margin:0; }
-        .checkbox-group input[type=checkbox]:checked + span { color:#3b82f6; }
-        .tabs { display:flex; gap:4px; margin-bottom:20px; }
-        .tab { padding:8px 16px; border-radius:6px 6px 0 0; cursor:pointer; color:#94a3b8; font-size:13px; }
-        .tab.active { background:#1e293b; color:#f8fafc; }
-        .empty-state { text-align:center; padding:40px; color:#475569; }
-        .empty-state .icon { font-size:40px; margin-bottom:10px; }
-        .collapsible { border-bottom:1px solid #1e293b; user-select:none; }
+        .msg { padding:9px 13px; margin-bottom:6px; border-radius:8px; font-size:13px; line-height:1.55; }
+        .msg-user { background:#1b2c47; border:1px solid #24395c; }
+        .msg-agent { background:#172a22; border:1px solid #21402f; }
+        .msg-role { font-size:11px; color:var(--text-dim); margin-bottom:3px; font-weight:600; }
+        .checkbox-group { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+        .checkbox-group label { display:flex; align-items:center; gap:7px; cursor:pointer; padding:7px 13px; border:1px solid var(--border); border-radius:8px; font-size:13px; color:var(--text-dim); transition:border-color .14s,color .14s,background .14s; margin:0; }
+        .checkbox-group label:hover { border-color:var(--accent); color:var(--text); background:rgba(79,140,255,.05); }
+        .checkbox-group input[type=checkbox] { width:auto; margin:0; accent-color:var(--accent); }
+        .checkbox-group input[type=checkbox]:checked + span { color:var(--accent); }
+        .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+        .tab { padding:9px 16px; border-radius:8px 8px 0 0; cursor:pointer; color:var(--text-dim); font-size:13px; font-weight:500; transition:color .14s,background .14s; }
+        .tab:hover { color:var(--text); }
+        .tab.active { background:var(--panel); color:#f8fafc; box-shadow:inset 0 -2px 0 var(--accent); }
+        .empty-state { text-align:center; padding:44px; color:var(--text-mute); }
+        .empty-state .icon { font-size:42px; margin-bottom:12px; opacity:.6; }
+        .collapsible { border-bottom:1px solid var(--border-soft); user-select:none; }
         .collapsible:hover { background:rgba(255,255,255,0.02); border-radius:4px; }
         .collapsible .caret { font-size:8px; transition:transform 0.2s; display:inline-block; }
         .collapsible.open .caret { transform:rotate(90deg); }
-        .section-card { background:#0f172a; border:1px solid #1e293b; border-radius:8px; padding:0; margin-bottom:8px; overflow:hidden; }
-        .section-card-header { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; user-select:none; }
+        .section-card { background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:10px; padding:0; margin-bottom:8px; overflow:hidden; transition:border-color .14s; }
+        .section-card:hover { border-color:var(--border); }
+        .section-card-header { display:flex; align-items:center; gap:8px; padding:11px 15px; cursor:pointer; user-select:none; }
         .section-card-header:hover { background:rgba(255,255,255,0.03); }
-        .section-card-header .caret { font-size:8px; transition:transform 0.2s; display:inline-block; color:#64748b; }
+        .section-card-header .caret { font-size:8px; transition:transform 0.2s; display:inline-block; color:var(--text-mute); }
         .section-card-header.open .caret { transform:rotate(90deg); }
-        .section-card-body { padding:8px 14px 12px; border-top:1px solid #1e293b; }
-        .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; background:#3b82f620; color:#60a5fa; margin:2px; cursor:default; }
-        .tag-remove { cursor:pointer; margin-left:4px; color:#94a3b8; }
-        .tag-remove:hover { color:#ef4444; }
-        .tag-input-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:center; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:6px 10px; min-height:40px; }
+        .section-card-body { padding:9px 15px 13px; border-top:1px solid var(--border-soft); }
+        .tag { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; background:#4f8cff20; color:#93b4ff; margin:2px; cursor:default; }
+        .tag-remove { cursor:pointer; margin-left:4px; color:var(--text-dim); }
+        .tag-remove:hover { color:var(--red); }
+        .tag-input-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:center; background:var(--bg-soft); border:1px solid var(--border); border-radius:9px; padding:6px 10px; min-height:42px; }
         .tag-input-wrap input { border:none; background:transparent; padding:4px; width:auto; min-width:100px; flex:1; margin:0; }
-        .tag-input-wrap input:focus { outline:none; border:none; }
-        .suite-card { background:#1e293b; border-radius:10px; padding:16px; margin-bottom:12px; border:1px solid #334155; }
-        .suite-card:hover { border-color:#3b82f6; }
-        .suite-card h3 { font-size:15px; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+        .tag-input-wrap input:focus { outline:none; border:none; box-shadow:none; }
+        .suite-card { background:var(--bg-soft); border-radius:12px; padding:13px 15px; margin-bottom:9px; border:1px solid var(--border); transition:border-color .14s,box-shadow .14s; }
+        .suite-card:hover { border-color:#34466a; box-shadow:var(--shadow); }
+        .suite-card h3 { font-size:15px; margin:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .suite-card .test-list { display:flex; flex-wrap:wrap; gap:4px; }
         .suite-card .test-chip { font-size:11px; padding:3px 8px; background:#0f172a; border-radius:4px; color:#94a3b8; }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <div class="logo"><span>ATTEST</span></div>
+        <div class="logo">
+            <span class="mark">A</span>
+            <div><span>ATTEST</span><div class="tag">Agent Test Suite</div></div>
+        </div>
         <a class="nav-item active" onclick="showPage('home')" id="nav-home">🏠 Dashboard</a>
+        <div class="nav-section">Setup</div>
         <a class="nav-item" onclick="showPage('setup')" id="nav-setup">🔌 Agent Setup</a>
         <a class="nav-item" onclick="showPage('tests')" id="nav-tests">📝 Test Cases</a>
         <a class="nav-item" onclick="showPage('suites')" id="nav-suites">🏷️ Test Suites</a>
+        <div class="nav-section">Run &amp; Evaluate</div>
         <a class="nav-item" onclick="showPage('run')" id="nav-run">▶️ Run Tests</a>
         <a class="nav-item" onclick="showPage('results')" id="nav-results">📊 Results</a>
-        <a class="nav-item" onclick="showPage('settings')" id="nav-settings">⚙️ Settings</a>
+        <div class="nav-section">Advanced</div>
+        <a class="nav-item" onclick="showPage('baselines')" id="nav-baselines">📸 Baselines</a>
+        <div class="nav-bottom">
+            <a class="nav-item" onclick="showPage('settings')" id="nav-settings">⚙️ Settings</a>
+            <a class="nav-item" onclick="showPage('about')" id="nav-about">💡 Help &amp; About</a>
+        </div>
     </div>
     <div class="main">
 
 <!-- ================= HOME ================= -->
 <div class="page active" id="page-home">
-    <h1>Dashboard</h1>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:22px">
+        <div>
+            <h1 id="homeGreeting">Welcome to ATTEST</h1>
+            <div class="subtitle" style="margin:0">End-to-end testing &amp; trust evaluation for AI agents — your workspace at a glance.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="homeRunBtn" onclick="runAllTests()">▶ Run All Tests</button>
+            <button class="btn btn-outline" id="homeStopBtn" style="display:none;color:#f87171;border-color:#f87171" onclick="cancelRun()">⏹ Stop</button>
+            <button class="btn btn-outline" onclick="showPage('about')">💡 Getting Started</button>
+        </div>
+    </div>
     <div id="homeAlert"></div>
-    <div class="cards" id="summaryCards">
-        <div class="card"><div class="value" id="c-total">—</div><div class="label">Total Tests</div></div>
-        <div class="card"><div class="value status-pass" id="c-passed">—</div><div class="label">Passed</div></div>
-        <div class="card"><div class="value status-fail" id="c-failed">—</div><div class="label">Failed</div></div>
-        <div class="card"><div class="value" id="c-rate" style="color:#3b82f6">—</div><div class="label">Pass Rate</div></div>
-        <div class="card"><div class="value" id="c-duration">—</div><div class="label">Duration</div></div>
+    <div id="homeRunStatus" style="margin-bottom:14px;color:#9aa7bd"></div>
+
+    <!-- Workspace overview: setup counts -->
+    <div class="cards">
+        <div class="card" style="cursor:pointer" onclick="showPage('setup')"><div class="value" id="c-agents" style="color:#93b4ff">—</div><div class="label">🔌 Agents</div></div>
+        <div class="card" style="cursor:pointer" onclick="showPage('tests')"><div class="value" id="c-testcases" style="color:#a5b4fc">—</div><div class="label">📝 Test Cases</div></div>
+        <div class="card" style="cursor:pointer" onclick="showPage('suites')"><div class="value" id="c-suites" style="color:#c4b5fd">—</div><div class="label">🏷️ Suites</div></div>
+        <div class="card" style="cursor:pointer" onclick="loadRunHistory();showPage('results')"><div class="value" id="c-runs" style="color:#67e8f9">—</div><div class="label">📋 Runs Logged</div></div>
     </div>
-    <div style="margin-bottom:20px;">
-        <button class="btn btn-primary" id="homeRunBtn" onclick="runAllTests()">▶ Run All Tests</button>
-        <span id="homeRunStatus" style="margin-left:12px;color:#94a3b8"></span>
-    </div>
+
+    <!-- Latest run results overview -->
     <div class="section">
-        <h2>Latest Results</h2>
+        <h2 style="margin-bottom:4px">Latest Run</h2>
+        <div class="subtitle" style="margin:0 0 16px">Summary of your most recent test execution.</div>
+        <div class="cards" id="summaryCards" style="margin-bottom:0">
+            <div class="card"><div class="value" id="c-total">—</div><div class="label">Total Tests</div></div>
+            <div class="card"><div class="value status-pass" id="c-passed">—</div><div class="label">Passed</div></div>
+            <div class="card"><div class="value status-fail" id="c-failed">—</div><div class="label">Failed</div></div>
+            <div class="card"><div class="value status-error" id="c-errors">—</div><div class="label">Errors</div></div>
+            <div class="card"><div class="value" id="c-rate" style="color:#4f8cff">—</div><div class="label">Pass Rate</div></div>
+            <div class="card"><div class="value" id="c-duration">—</div><div class="label">Duration</div></div>
+            <div class="card"><div class="value" id="c-cost" style="color:#22d3ee">—</div><div class="label">Total Cost</div></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Latest Results <span style="font-size:12px;font-weight:normal;color:#64748b">— most recent runs</span></h2>
+        <div class="table-wrap">
         <table><thead><tr><th>Test</th><th>Suite</th><th>Agent</th><th>Status</th><th>Scores</th><th>Latency</th></tr></thead>
         <tbody id="homeTableBody"></tbody></table>
+        </div>
     </div>
 </div>
 
@@ -147,6 +215,8 @@
             <div class="form-group"><label>Agent Type</label><select id="s-type" onchange="toggleAgentFields()">
                 <option value="foundry_prompt">Azure Foundry Prompt Agent</option>
                 <option value="http">HTTP / REST API</option>
+                <option value="mcp">MCP Server (Model Context Protocol)</option>
+                <option value="__codeonly__">Other framework (LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants)…</option>
             </select></div>
         </div>
         <div id="foundryFields">
@@ -162,10 +232,45 @@
                 <div class="form-group"><label>Request Path</label><input id="s-http-path" value="/chat"></div>
                 <div class="form-group"><label>Response JSONPath</label><input id="s-http-response" value="$.response"></div>
             </div>
+            <details style="margin-top:6px">
+                <summary style="cursor:pointer;color:#93b4ff;font-size:13px;font-weight:600;user-select:none">🔀 Multi-agent routing (optional)</summary>
+                <div style="font-size:12px;color:#9aa7bd;margin:8px 0 10px;line-height:1.5">If this is an <strong>orchestrator</strong> that delegates to sub-agents, point these at the routing fields in its JSON response. Then use the <code>routed_to</code> / <code>routing_path</code> assertions to verify delegation.</div>
+                <div class="form-row">
+                    <div class="form-group"><label>Handled-By JSONPath <span style="color:#6b7894;font-size:11px">(sub-agent name)</span></label><input id="s-http-handledby" placeholder="$.handled_by"></div>
+                    <div class="form-group"><label>Routing-Path JSONPath <span style="color:#6b7894;font-size:11px">(chain list)</span></label><input id="s-http-routingpath" placeholder="$.routing_path"></div>
+                </div>
+            </details>
+        </div>
+        <div id="mcpFields" style="display:none">
+            <div class="form-row">
+                <div class="form-group"><label>Transport</label><select id="s-mcp-transport" onchange="toggleMcpTransport()">
+                    <option value="stdio">stdio (launch a local server)</option>
+                    <option value="sse">sse (connect to a running server)</option>
+                </select></div>
+                <div class="form-group"><label>Default Tool <span style="color:#64748b;font-size:11px">(tool to call)</span></label><input id="s-mcp-tool" placeholder="search"></div>
+            </div>
+            <div id="mcpStdioFields">
+                <div class="form-row">
+                    <div class="form-group"><label>Command</label><input id="s-mcp-command" placeholder="python"></div>
+                    <div class="form-group"><label>Arguments <span style="color:#64748b;font-size:11px">(comma-separated)</span></label><input id="s-mcp-args" placeholder="my_mcp_server.py"></div>
+                </div>
+            </div>
+            <div id="mcpSseFields" style="display:none">
+                <div class="form-group"><label>Server URL (SSE)</label><input id="s-mcp-url" placeholder="http://localhost:8000/sse"></div>
+            </div>
+            <div class="form-group"><label>Input Argument <span style="color:#64748b;font-size:11px">(tool arg that receives the message)</span></label><input id="s-mcp-input-arg" value="input" placeholder="query"></div>
+        </div>
+        <div id="codeOnlyFields" style="display:none">
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;font-size:13px;color:#cbd5e1;line-height:1.6">
+                <strong style="color:#a78bfa">LangChain / LangGraph / CrewAI / AutoGen / OpenAI Assistants</strong> agents are in-process Python objects, so they're wired up in code rather than a web form. Use the matching adapter:
+                <pre style="background:#0f172a;border-radius:6px;padding:10px;margin-top:8px;overflow-x:auto;font-size:12px;color:#e2e8f0">from attest.adapters import LangChainAgentAdapter
+adapter = LangChainAgentAdapter(your_executor)</pre>
+                <div style="margin-top:6px;color:#94a3b8">See the <code>examples/</code> folder for ready-to-run samples. For no-code agents, use HTTP/REST, Foundry, or MCP above.</div>
+            </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:12px;">
-            <button class="btn btn-primary" onclick="saveAgent()">💾 Save Agent</button>
-            <button class="btn btn-outline" onclick="testConnection()">🔌 Test Connection</button>
+            <button class="btn btn-primary" id="saveAgentBtn" onclick="saveAgent()">💾 Save Agent</button>
+            <button class="btn btn-outline" id="testConnBtn" onclick="testConnection()">🔌 Test Connection</button>
             <button class="btn btn-outline" onclick="resetAgentForm()" style="color:#94a3b8">✕ Cancel</button>
         </div>
         <div id="connResult" style="margin-top:12px"></div>
@@ -288,6 +393,35 @@
             <div class="section-card-header" onclick="toggleCard(this)">
                 <span class="caret">▶</span>
                 <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#22c55e">🛡️ Safety & Quality</span>
+                </label>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label title="Fail if the response leaks emails, SSNs, credit cards, phones, or IPs"><input type="checkbox" data-assert="no_pii"> <span>No PII (privacy)</span></label>
+                    <input id="t-pii-types" placeholder="all types (or: ssn, credit_card)" style="width:240px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="Fail if the token cost of the response exceeds the budget"><input type="checkbox" data-assert="response_cost_under"> <span>Cost Under (USD):</span></label>
+                    <input id="t-cost" placeholder="0.05" style="width:80px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="Fail if the response is not in the expected language"><input type="checkbox" data-assert="language_is"> <span>Language Is:</span></label>
+                    <input id="t-language" placeholder="en, es, fr, de..." style="width:120px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="Fail if the response is not semantically similar to the reference answer"><input type="checkbox" data-assert="semantic_match"> <span>Semantic Match:</span></label>
+                    <input id="t-semantic-expected" placeholder="reference answer" style="width:240px;display:inline">
+                    <input id="t-semantic-threshold" placeholder="0.8" title="min similarity 0-1" style="width:60px;display:inline">
+                </div>
+                <div style="font-size:11px;color:#475569;margin-top:6px">Semantic Match uses embeddings (needs an API key). Others are instant & free.</div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
                     <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#f97316">🔧 Tool Call Assertions</span>
                 </label>
             </div>
@@ -308,6 +442,33 @@
                     <label><input type="checkbox" data-assert="tool_call_order"> <span>Call Order:</span></label>
                     <input id="t-tool-order" placeholder="search,book,confirm" style="width:250px;display:inline">
                 </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'assert')"> <span style="font-size:13px;color:#a78bfa">🔀 Multi-Agent Routing</span>
+                </label>
+                <span style="font-size:10px;color:#475569">— for orchestrators that delegate to sub-agents</span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label title="The final sub-agent that should handle the request"><input type="checkbox" data-assert="routed_to"> <span>Routed To:</span></label>
+                    <input id="t-routed-to" placeholder="flights_agent" style="width:160px;display:inline">
+                    <label title="A sub-agent that must NOT handle the request"><input type="checkbox" data-assert="not_routed_to"> <span>NOT Routed To:</span></label>
+                    <input id="t-not-routed-to" placeholder="billing_agent" style="width:150px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="The exact ordered routing chain"><input type="checkbox" data-assert="routing_path"> <span>Routing Path (exact):</span></label>
+                    <input id="t-routing-path" placeholder="orchestrator, flights_agent" style="width:250px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="An agent that must appear somewhere in the routing chain"><input type="checkbox" data-assert="routing_path_contains"> <span>Path Contains:</span></label>
+                    <input id="t-routing-contains" placeholder="orchestrator" style="width:180px;display:inline">
+                </div>
+                <div style="font-size:11px;color:#475569;margin-top:6px">Requires an orchestrator agent with <code>handled_by</code> / <code>routing_path</code> configured in Agent Setup (HTTP) or an in-process graph adapter.</div>
             </div>
         </div>
 
@@ -453,6 +614,25 @@
             </div>
         </div>
 
+        <div class="section-card">
+            <div class="section-card-header" onclick="toggleCard(this)">
+                <span class="caret">▶</span>
+                <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#a78bfa">🔬 RAGAS — RAG Metrics (4)</span>
+                </label>
+                <span id="ragas-eval-status" style="font-size:10px;color:#475569"></span>
+            </div>
+            <div class="section-card-body" style="display:none">
+                <div class="checkbox-group">
+                    <label title="Is the answer grounded in the retrieved context?"><input type="checkbox" data-eval="ragas_faithfulness"> <span>Faithfulness</span></label>
+                    <label title="Does the answer address the question?"><input type="checkbox" data-eval="ragas_answer_relevancy"> <span>Answer Relevancy</span></label>
+                    <label title="Is the retrieved context relevant/precise?"><input type="checkbox" data-eval="ragas_context_precision"> <span>Context Precision</span></label>
+                    <label title="Does the context cover the reference answer?"><input type="checkbox" data-eval="ragas_context_recall"> <span>Context Recall</span></label>
+                </div>
+                <div style="font-size:11px;color:#475569;margin-top:6px">RAG metrics — provide <strong>Context</strong> above. Context Precision/Recall also use Expected Output as the reference.</div>
+            </div>
+        </div>
+
         <!-- Tags -->
         <div class="form-group">
             <label>Tags (press Enter or comma to add)</label>
@@ -557,8 +737,10 @@
     <div id="testTab-list" class="section" style="display:none">
         <h2>All Test Cases</h2>
         <button class="btn btn-outline btn-sm" onclick="loadTestCases()" style="margin-bottom:12px">🔄 Refresh</button>
+        <div class="table-wrap">
         <table><thead><tr><th>Name</th><th>Suite</th><th>Type</th><th>Input</th><th>Tags</th><th>Assertions</th><th>Evaluators</th><th></th></tr></thead>
         <tbody id="testListBody"></tbody></table>
+        </div>
     </div>
 </div>
 
@@ -571,8 +753,8 @@
     <!-- Create Suite -->
     <div class="section">
         <h2>Create New Suite</h2>
-        <div style="display:flex;gap:12px;align-items:end;">
-            <div style="flex:1">
+        <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px">
                 <label>Suite Name</label>
                 <input id="newSuiteName2" placeholder="e.g. Performance Tests" style="margin:0">
             </div>
@@ -595,8 +777,8 @@
     <div class="section">
         <h2>🏷️ Tags</h2>
         <p style="font-size:12px;color:#64748b;margin-bottom:15px">Tags group tests across suites. One test can have many tags. Use tags for cross-cutting concerns like <em>regression</em>, <em>smoke</em>, <em>security</em>.</p>
-        <div style="display:flex;gap:12px;margin-bottom:15px;align-items:end;">
-            <div style="flex:1">
+        <div style="display:flex;gap:12px;margin-bottom:15px;align-items:end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px">
                 <label>Add Tag to Tests</label>
                 <input id="newTagName" placeholder="e.g. regression, smoke, security" style="margin:0">
             </div>
@@ -624,28 +806,41 @@
     <div class="subtitle">Select what to run and start execution.</div>
     <div id="runAlert"></div>
 
-    <!-- Agent Override Selector -->
-    <div class="section" style="padding:14px 20px">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;color:#94a3b8">Run tests with agent:</span>
-            <select id="runAgentSelect" style="width:auto;margin:0;min-width:180px">
-                <option value="">Default (as configured per test)</option>
-            </select>
-            <span style="font-size:11px;color:#475569">Override the agent for all tests in this run</span>
+    <!-- Execution Options -->
+    <div class="section" style="padding:16px 20px">
+        <div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap">
+            <div>
+                <label style="margin-bottom:4px">Agent</label>
+                <select id="runAgentSelect" style="width:auto;margin:0;min-width:200px">
+                    <option value="">Default (per test config)</option>
+                </select>
+            </div>
+            <div>
+                <label style="margin-bottom:4px">Parallel</label>
+                <input type="number" id="runParallel" value="1" min="1" max="20" style="width:70px;margin:0;text-align:center" title="Max concurrent tests (1 = sequential)">
+            </div>
+            <div>
+                <label style="margin-bottom:4px">Profile</label>
+                <select id="runProfile" style="width:auto;margin:0;min-width:150px">
+                    <option value="">Default</option>
+                </select>
+            </div>
+            <div style="font-size:11px;color:#475569;padding-bottom:12px">Profiles & agents come from attest.yaml</div>
         </div>
     </div>
 
     <!-- Tag-based quick run -->
     <div class="section" id="runTagSection" style="display:none">
         <h2>🏷️ Run by Tag (Suite)</h2>
-        <div id="runTagButtons" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="runTagButtons" style="display:block"></div>
     </div>
 
     <div class="section">
         <h2>📦 File-Based Suites</h2>
         <div id="suitesList">Loading...</div>
-        <div style="margin-top:15px;display:flex;gap:10px;">
+        <div style="margin-top:15px;display:flex;gap:10px;align-items:center;">
             <button class="btn btn-primary" onclick="runAllTests()">▶ Run All Tests</button>
+            <button class="btn btn-outline" id="runStopBtn" style="display:none;color:#ef4444;border-color:#ef4444" onclick="cancelRun()">⏹ Stop</button>
             <span id="runPageStatus" style="color:#94a3b8;line-height:40px"></span>
         </div>
     </div>
@@ -654,10 +849,11 @@
 <!-- ================= RESULTS ================= -->
 <div class="page" id="page-results">
     <h1>Test Results</h1>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px">
         <div class="subtitle" style="margin:0">Click any test to see conversation details and scores.</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-outline btn-sm" onclick="loadRunHistory()">📋 Run History</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleComparePanel()">🔀 Compare Runs</button>
             <a href="/api/download/report" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📥 HTML Report</a>
             <a href="/api/download/csv" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📊 Export CSV</a>
             <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="clearResults()">🗑️ Clear Results</button>
@@ -680,6 +876,26 @@
         <span id="resultsCount" style="font-size:12px;color:#64748b;margin-left:auto"></span>
     </div>
 
+    <!-- Compare Runs panel -->
+    <div id="comparePanel" style="display:none;margin-bottom:15px">
+        <div class="section" style="padding:16px">
+            <h2 style="font-size:14px;margin-bottom:12px">🔀 Compare Two Runs</h2>
+            <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+                <div>
+                    <label style="font-size:12px">Baseline (A)</label>
+                    <select id="compareRunA" style="width:auto;margin:0;min-width:220px"></select>
+                </div>
+                <div style="font-size:18px;color:#64748b;padding-bottom:8px">→</div>
+                <div>
+                    <label style="font-size:12px">Compare (B)</label>
+                    <select id="compareRunB" style="width:auto;margin:0;min-width:220px"></select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="runComparison()">Compare</button>
+            </div>
+            <div id="compareResults"></div>
+        </div>
+    </div>
+
     <!-- Run selector -->
     <div id="runHistoryPanel" style="display:none;margin-bottom:15px">
         <div class="section" style="padding:12px">
@@ -688,13 +904,40 @@
         </div>
     </div>
 
+    <div class="table-wrap">
     <table><thead><tr><th>Test</th><th>Suite</th><th>Agent</th><th>Status</th><th>Scores</th><th>Assertions</th><th>Latency</th></tr></thead>
     <tbody id="resultsTableBody"></tbody></table>
+    </div>
+</div>
+
+<!-- ================= BASELINES ================= -->
+<div class="page" id="page-baselines">
+    <h1>Baselines</h1>
+    <div class="subtitle">Manage golden response snapshots for regression testing.</div>
+    <div id="baselineAlert" style="margin-bottom:12px"></div>
+
+    <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;">
+        <button class="btn btn-primary" onclick="saveBaselines()">📸 Save New Baselines</button>
+        <button class="btn btn-outline" onclick="diffBaselines()">🔍 Compare with Baselines</button>
+        <button class="btn btn-outline" id="baselineStopBtn" style="display:none;color:#ef4444;border-color:#ef4444" onclick="cancelRun()">⏹ Stop</button>
+        <button class="btn btn-outline" style="color:#ef4444;border-color:#ef4444" onclick="clearBaselines()">🗑️ Clear All</button>
+    </div>
+
+    <div class="section">
+        <h2>Saved Baselines</h2>
+        <div id="baselineList">Loading...</div>
+    </div>
+
+    <div class="section" id="baselineDiffSection" style="display:none">
+        <h2>Baseline Comparison</h2>
+        <div id="baselineDiffResults"></div>
+    </div>
 </div>
 
 <!-- ================= SETTINGS ================= -->
 <div class="page" id="page-settings">
     <h1>Settings</h1>
+    <div class="subtitle">Set API keys, control evaluation cost & caching, and check which evaluator backends are installed.</div>
     <div id="settingsKeyStatus" style="margin-bottom:16px"></div>
     <div class="section">
         <h2>API Keys</h2>
@@ -716,9 +959,171 @@
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">💾 Save Keys</button>
         <div id="settingsAlert" style="margin-top:12px"></div>
     </div>
+
+    <!-- Execution Settings -->
+    <div class="section">
+        <h2>Execution &amp; Cost Settings</h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Configure caching, rate limiting, cost controls, and Foundry integration.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="form-group">
+                <label>Response Caching</label>
+                <select id="set-cache" style="margin:0">
+                    <option value="true">Enabled — cache identical requests</option>
+                    <option value="false">Disabled</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Rate Limit <span style="color:#64748b;font-size:11px">(requests/sec, 0 = no limit)</span></label>
+                <input id="set-rate-limit" type="number" value="0" min="0" step="0.5" style="margin:0">
+            </div>
+            <div class="form-group">
+                <label>Max Eval Cost Per Run <span style="color:#64748b;font-size:11px">(USD)</span></label>
+                <input id="set-max-cost" type="number" value="5.00" min="0" step="0.50" style="margin:0">
+            </div>
+            <div class="form-group">
+                <label>Foundry Portal Upload</label>
+                <select id="set-foundry-upload" style="margin:0">
+                    <option value="false">Disabled</option>
+                    <option value="true">Enabled — upload results to Foundry</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveExecutionSettings()" style="margin-top:8px">💾 Save Execution Settings</button>
+        <div id="execSettingsAlert" style="margin-top:12px"></div>
+    </div>
+
+    <div class="section">
+        <h2>🧹 Demo &amp; Example Data</h2>
+        <div style="font-size:13px;color:#9aa7bd;margin-bottom:12px">
+            ATTEST ships with example tests and sample results so you can explore every feature
+            immediately. When you're ready to use your own agent, clear the demo data for a clean slate.
+        </div>
+        <div id="demoStatus" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-outline" style="color:#f87171;border-color:#f87171" onclick="removeDemoData()">🧹 Remove Demo Data</button>
+            <button class="btn btn-outline" onclick="restoreDemoData()">↩️ Restore Demo Data</button>
+        </div>
+        <div id="demoAlert" style="margin-top:12px"></div>
+        <div style="font-size:11px;color:#6b7894;margin-top:10px">
+            Removing demo data only hides the bundled examples — it never deletes tests or results you created.
+            The example test files live in <code>tests/scenarios/example_*.yaml</code>.
+        </div>
+    </div>
+
     <div class="section">
         <h2>Current Configuration</h2>
         <div id="configDisplay">Loading...</div>
+    </div>
+</div>
+
+<!-- ================= HELP & ABOUT ================= -->
+<div class="page" id="page-about">
+    <h1>Help &amp; About</h1>
+    <div class="subtitle">How to use ATTEST, plus what it is and what it can do.</div>
+
+    <!-- Getting Started -->
+    <div class="section" style="border:1px solid #2c3e63;background:linear-gradient(180deg,#16213c,#141b30)">
+        <h2 style="margin-bottom:6px">👋 Getting Started</h2>
+        <p style="color:#9aa7bd;font-size:13px;margin:0 0 18px">Four steps to your first evaluated test run. Each card jumps to the right page.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+            <div class="gs-step" onclick="showPage('setup')">
+                <div class="gs-num">1</div>
+                <div><div class="gs-title">🔌 Connect your agent</div><div class="gs-desc">Add an agent (Foundry, HTTP, or MCP) in Agent Setup, then test the connection.</div></div>
+            </div>
+            <div class="gs-step" onclick="showPage('tests')">
+                <div class="gs-num">2</div>
+                <div><div class="gs-title">📝 Create test cases</div><div class="gs-desc">Define inputs, deterministic assertions &amp; LLM evaluators — or upload a CSV / generate with AI.</div></div>
+            </div>
+            <div class="gs-step" onclick="showPage('run')">
+                <div class="gs-num">3</div>
+                <div><div class="gs-title">▶️ Run tests</div><div class="gs-desc">Run everything, a suite, a tag, or a single test — sequentially or in parallel.</div></div>
+            </div>
+            <div class="gs-step" onclick="showPage('results')">
+                <div class="gs-num">4</div>
+                <div><div class="gs-title">📊 Review results</div><div class="gs-desc">Inspect scores, latency, assertions &amp; conversations; compare runs and export reports.</div></div>
+            </div>
+        </div>
+        <div style="margin-top:16px;font-size:12.5px;color:#8290ab;line-height:1.6">
+            💡 <strong style="color:#cbd5e1">Tip:</strong> set your API key in
+            <a onclick="showPage('settings')" style="color:#4f8cff;cursor:pointer">⚙️ Settings</a> first so LLM evaluators can score responses.
+            Use <a onclick="showPage('baselines')" style="color:#4f8cff;cursor:pointer">📸 Baselines</a> to catch regressions over time.
+            <br>📦 <strong style="color:#cbd5e1">New here?</strong> The app ships with <strong>example results</strong> for every test type so you can explore right away — hide them anytime in
+            <a onclick="showPage('settings')" style="color:#4f8cff;cursor:pointer">⚙️ Settings → Demo &amp; Example Data</a>.
+        </div>
+    </div>
+
+    <!-- What is ATTEST -->
+    <div class="section">
+        <h2>🛡️ What is ATTEST?</h2>
+        <p style="color:#c2cce0;font-size:13.5px;line-height:1.7;margin:0">
+            <strong>ATTEST</strong> (Agent Testing &amp; Trust Evaluation Suite) is an end-to-end framework for testing AI agents.
+            It combines fast, free <em>deterministic assertions</em> (structure, latency, cost, PII, tool calls) with
+            <em>LLM-based evaluators</em> (relevancy, faithfulness, safety, tone, and more) so you can measure both
+            <em>correctness</em> and <em>trust</em> in a single run — locally or in CI.
+        </p>
+    </div>
+
+    <!-- Capabilities -->
+    <div class="section">
+        <h2>What it can do</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px">
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">🔌</div>
+                <div><div class="gs-title">9 agent adapters</div><div class="gs-desc">HTTP, Callable, Foundry, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants &amp; MCP — plus an offline <code>mock</code> adapter that powers the bundled demo.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">✅</div>
+                <div><div class="gs-title">32 assertions</div><div class="gs-desc">Deterministic checks — JSON shape, latency, cost, no-PII, language, semantic match &amp; more.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">🧪</div>
+                <div><div class="gs-title">36 LLM evaluators</div><div class="gs-desc">Built-in + DeepEval + Azure AI evaluators, plus RAGAS for retrieval quality.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">💬</div>
+                <div><div class="gs-title">Multi-turn &amp; simulation</div><div class="gs-desc">Single-turn, scripted conversations, and goal-driven user simulations.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">🔀</div>
+                <div><div class="gs-title">Multi-agent routing</div><div class="gs-desc">Test orchestrators that delegate to sub-agents — verify the routing path &amp; which agent handled each request.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">📸</div>
+                <div><div class="gs-title">Baselines &amp; regression</div><div class="gs-desc">Snapshot golden responses and fail the build when behavior drifts.</div></div>
+            </div>
+            <div class="gs-step" style="cursor:default">
+                <div style="font-size:22px">📊</div>
+                <div><div class="gs-title">Reports &amp; CI</div><div class="gs-desc">HTML / Markdown / JUnit reports, run comparison, and CI templates.</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Concepts -->
+    <div class="section">
+        <h2>Key concepts</h2>
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="padding:13px 15px;background:#0f172a;border:1px solid #1e2840;border-radius:10px">
+                <div style="font-weight:600;color:#e8edf6;font-size:13.5px;margin-bottom:3px">Assertions vs. Evaluators</div>
+                <div style="font-size:12.5px;color:#9aa7bd;line-height:1.6"><strong>Assertions</strong> are instant, free, pass/fail checks. <strong>Evaluators</strong> call an LLM to score qualities like relevancy or safety (0–1). To save cost, evaluators are skipped when assertions fail.</div>
+            </div>
+            <div style="padding:13px 15px;background:#0f172a;border:1px solid #1e2840;border-radius:10px">
+                <div style="font-weight:600;color:#e8edf6;font-size:13.5px;margin-bottom:3px">Suites &amp; Tags</div>
+                <div style="font-size:12.5px;color:#9aa7bd;line-height:1.6"><strong>File suites</strong> group tests by YAML file. <strong>Tag suites</strong> are virtual groups across files — run either as a unit from the Run page.</div>
+            </div>
+            <div style="padding:13px 15px;background:#0f172a;border:1px solid #1e2840;border-radius:10px">
+                <div style="font-weight:600;color:#e8edf6;font-size:13.5px;margin-bottom:3px">Runs &amp; Comparison</div>
+                <div style="font-size:12.5px;color:#9aa7bd;line-height:1.6">Every execution is saved to run history. Name runs and compare any two side-by-side to see score improvements or regressions.</div>
+            </div>
+            <div style="padding:13px 15px;background:#0f172a;border:1px solid #1e2840;border-radius:10px">
+                <div style="font-weight:600;color:#e8edf6;font-size:13.5px;margin-bottom:3px">Multi-agent routing</div>
+                <div style="font-size:12.5px;color:#9aa7bd;line-height:1.6">For <strong>orchestrators</strong> that delegate to sub-agents, point an HTTP agent's <code>handled_by</code> / <code>routing_path</code> fields at its response (in Agent Setup), then assert delegation with <code>routed_to</code>, <code>not_routed_to</code>, <code>routing_path</code> and <code>routing_path_contains</code>. In-process graphs (LangGraph, CrewAI, AutoGen) test the same way via their adapters.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section" style="text-align:center;color:#6b7894;font-size:12px">
+        ATTEST · Agent Testing &amp; Trust Evaluation Suite ·
+        <a href="https://github.com/ManikantaBathinedi/ATTEST" target="_blank" style="color:#4f8cff">GitHub</a>
     </div>
 </div>
 
@@ -735,8 +1140,9 @@ function showPage(name) {
     if (name==='tests') { loadTestCases(); checkEvaluatorStatus(); }
     if (name==='run') loadSuites();
     if (name==='suites') loadSuitesPage();
-    if (name==='settings') loadConfigDisplay();
+    if (name==='settings') { loadConfigDisplay(); loadExecutionConfig(); loadDemoStatus(); }
     if (name==='setup') loadAgentSetup();
+    if (name==='baselines') loadBaselineList();
 }
 
 function showTestTab(name) {
@@ -816,6 +1222,8 @@ async function editAgent(name) {
             document.getElementById('s-http-endpoint').value = agent.endpoint || '';
             document.getElementById('s-http-path').value = agent.request_path || '/chat';
             document.getElementById('s-http-response').value = agent.response_path || '$.response';
+            document.getElementById('s-http-handledby').value = agent.handled_by_path || '';
+            document.getElementById('s-http-routingpath').value = agent.routing_path_path || '';
         }
         document.getElementById('agentFormTitle').textContent = 'Edit Agent: ' + name;
         document.getElementById('connResult').innerHTML = '';
@@ -893,6 +1301,19 @@ function toggleAgentFields() {
     const type = document.getElementById('s-type').value;
     document.getElementById('foundryFields').style.display = type==='foundry_prompt' ? 'block' : 'none';
     document.getElementById('httpFields').style.display = type==='http' ? 'block' : 'none';
+    const mcp = document.getElementById('mcpFields'); if (mcp) mcp.style.display = type==='mcp' ? 'block' : 'none';
+    const co = document.getElementById('codeOnlyFields'); if (co) co.style.display = type==='__codeonly__' ? 'block' : 'none';
+    // Hide Save/Test for code-only frameworks (configured in Python, not the UI)
+    const saveBtn = document.getElementById('saveAgentBtn');
+    const testBtn = document.getElementById('testConnBtn');
+    if (saveBtn) saveBtn.style.display = type==='__codeonly__' ? 'none' : '';
+    if (testBtn) testBtn.style.display = (type==='__codeonly__'||type==='mcp') ? 'none' : '';
+}
+
+function toggleMcpTransport() {
+    const t = document.getElementById('s-mcp-transport').value;
+    document.getElementById('mcpStdioFields').style.display = t==='stdio' ? 'block' : 'none';
+    document.getElementById('mcpSseFields').style.display = t==='sse' ? 'block' : 'none';
 }
 
 async function testConnection() {
@@ -932,10 +1353,24 @@ async function saveAgent() {
         body.endpoint = document.getElementById('s-endpoint').value;
         body.agent_name = document.getElementById('s-agent-name').value;
         body.agent_version = document.getElementById('s-agent-version').value;
+    } else if (type==='mcp') {
+        const transport = document.getElementById('s-mcp-transport').value;
+        body.transport = transport;
+        body.default_tool = document.getElementById('s-mcp-tool').value.trim();
+        body.input_arg = (document.getElementById('s-mcp-input-arg').value || 'input').trim();
+        if (transport==='stdio') {
+            body.command = document.getElementById('s-mcp-command').value.trim();
+            const args = document.getElementById('s-mcp-args').value.trim();
+            body.args = args ? args.split(',').map(s=>s.trim()).filter(Boolean) : [];
+        } else {
+            body.endpoint = document.getElementById('s-mcp-url').value.trim();
+        }
     } else {
         body.endpoint = document.getElementById('s-http-endpoint').value;
         body.request_path = document.getElementById('s-http-path').value;
         body.response_path = document.getElementById('s-http-response').value;
+        body.handled_by_path = (document.getElementById('s-http-handledby').value || '').trim() || undefined;
+        body.routing_path_path = (document.getElementById('s-http-routingpath').value || '').trim() || undefined;
     }
     try {
         const res = await fetch('/api/agents', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -993,6 +1428,16 @@ async function checkEvaluatorStatus() {
         const a2 = document.getElementById('azure-eval-status2');
         if (a1) a1.innerHTML = azHtml;
         if (a2) a2.innerHTML = azHtml;
+
+        // RAGAS status
+        if (data.ragas) {
+            const rgLabel = data.ragas.installed
+                ? (data.ragas.configured ? '✅ ready' : '⚠️ needs an API key')
+                : '❌ not installed — pip install ragas langchain-openai';
+            const rgColor = data.ragas.configured ? '#22c55e' : data.ragas.installed ? '#eab308' : '#ef4444';
+            const rg = document.getElementById('ragas-eval-status');
+            if (rg) rg.innerHTML = `<span style="color:${rgColor}">${rgLabel}</span>`;
+        }
     } catch(e) {}
 }
 
@@ -1079,6 +1524,22 @@ async function createTestCase() {
             }
         }
         if (type==='latency_under') { const v=document.getElementById('t-latency').value; if(v) assertions.push({latency_under:parseInt(v)}); }
+        // Safety & quality assertions
+        if (type==='no_pii') {
+            const v=(document.getElementById('t-pii-types').value||'').trim();
+            if(v && v.toLowerCase()!=='all types' && v.toLowerCase()!=='all') {
+                assertions.push({no_pii:v.split(',').map(s=>s.trim()).filter(Boolean)});
+            } else {
+                assertions.push({no_pii:true});
+            }
+        }
+        if (type==='response_cost_under') { const v=document.getElementById('t-cost').value; if(v) assertions.push({response_cost_under:parseFloat(v)}); }
+        if (type==='language_is') { const v=document.getElementById('t-language').value.trim(); if(v) assertions.push({language_is:v}); }
+        if (type==='semantic_match') {
+            const exp=document.getElementById('t-semantic-expected').value.trim();
+            const thr=parseFloat(document.getElementById('t-semantic-threshold').value) || 0.8;
+            if(exp) assertions.push({semantic_match:{expected:exp, min_similarity:thr}});
+        }
         // Tool call assertions
         if (type==='tool_called') { const v=document.getElementById('t-tool-name').value.trim(); if(v) assertions.push({tool_called:v}); }
         if (type==='tool_not_called') { const v=document.getElementById('t-tool-not-name').value.trim(); if(v) assertions.push({tool_not_called:v}); }
@@ -1092,6 +1553,14 @@ async function createTestCase() {
             const v=document.getElementById('t-tool-order').value.trim();
             if(v) assertions.push({tool_call_order:v.split(',').map(s=>s.trim()).filter(Boolean)});
         }
+        // Multi-agent routing assertions
+        if (type==='routed_to') { const v=document.getElementById('t-routed-to').value.trim(); if(v) assertions.push({routed_to:v}); }
+        if (type==='not_routed_to') { const v=document.getElementById('t-not-routed-to').value.trim(); if(v) assertions.push({not_routed_to:v}); }
+        if (type==='routing_path') {
+            const v=document.getElementById('t-routing-path').value.trim();
+            if(v) assertions.push({routing_path:v.split(',').map(s=>s.trim()).filter(Boolean)});
+        }
+        if (type==='routing_path_contains') { const v=document.getElementById('t-routing-contains').value.trim(); if(v) assertions.push({routing_path_contains:v}); }
         // Structured output assertions
         if (type==='response_is_json') assertions.push({response_is_json:true});
         if (type==='exact_match') { const v=document.getElementById('t-exact-match').value; if(v) assertions.push({exact_match:v}); }
@@ -1401,13 +1870,15 @@ async function loadSuitesPage() {
                 return `<div class="suite-card">
                     <h3 style="cursor:pointer" onclick="document.getElementById('${fileId}').style.display=document.getElementById('${fileId}').style.display==='none'?'block':'none'">
                         <span style="font-size:18px">📦</span>
-                        ${escH(s.name)}
-                        <span style="color:#64748b;font-size:12px;font-weight:normal">${s.test_count} test${s.test_count!==1?'s':''} · agent: ${s.agent||'default'}</span>
-                        <span style="flex:1"></span>
-                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runSuiteFromPage('${escH(s.name)}')">▶ Run All</button>
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();renameSuite('${escH(s.name)}')">✏️ Rename</button>
-                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();deleteSuite('${escH(s.name)}')">🗑️ Delete</button>
-                        <span style="color:#64748b;font-size:12px">▼</span>
+                        <span style="font-weight:600">${escH(s.name)}</span>
+                        <span style="color:#64748b;font-size:12px;font-weight:normal">${s.test_count} test${s.test_count!==1?'s':''} · ${s.agent||'default'}</span>
+                        <span style="flex:1;min-width:12px"></span>
+                        <span style="display:flex;align-items:center;gap:6px;flex:none">
+                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runSuiteFromPage('${escH(s.name)}')">▶ Run All</button>
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();renameSuite('${escH(s.name)}')">✏️ Rename</button>
+                            <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();deleteSuite('${escH(s.name)}')">🗑️ Delete</button>
+                            <span style="color:#64748b;font-size:12px">▼</span>
+                        </span>
                     </h3>
                     <div id="${fileId}" style="display:none;padding:0 4px">${testsHtml}</div>
                 </div>`;
@@ -1426,13 +1897,15 @@ async function loadSuitesPage() {
                 <div class="suite-card">
                     <h3 style="cursor:pointer" onclick="document.getElementById('${tagId}').style.display=document.getElementById('${tagId}').style.display==='none'?'block':'none'">
                         <span style="font-size:18px">🏷️</span>
-                        ${escH(s.name)}
+                        <span style="font-weight:600">${escH(s.name)}</span>
                         <span style="color:#64748b;font-size:12px;font-weight:normal">${s.test_count} test${s.test_count!==1?'s':''}</span>
-                        <span style="flex:1"></span>
-                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runByTag('${escH(s.name)}')">▶ Run All</button>
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openTagModal('add','${escH(s.name)}')">+ Add</button>
-                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();openTagModal('remove','${escH(s.name)}')">− Remove</button>
-                        <span style="color:#64748b;font-size:12px">▼</span>
+                        <span style="flex:1;min-width:12px"></span>
+                        <span style="display:flex;align-items:center;gap:6px;flex:none">
+                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runByTag('${escH(s.name)}')">▶ Run All</button>
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openTagModal('add','${escH(s.name)}')">+ Add</button>
+                            <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="event.stopPropagation();openTagModal('remove','${escH(s.name)}')">− Remove</button>
+                            <span style="color:#64748b;font-size:12px">▼</span>
+                        </span>
                     </h3>
                     <div id="${tagId}" style="display:none;padding:0 4px">
                         ${s.tests.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1e293b">
@@ -1628,9 +2101,25 @@ async function loadSuites() {
         const tagBtns = document.getElementById('runTagButtons');
         if (tagData.tag_suites && tagData.tag_suites.length > 0) {
             tagSection.style.display = 'block';
-            tagBtns.innerHTML = tagData.tag_suites.map(s => 
-                `<button class="btn btn-outline" onclick="runByTagFromRun('${escH(s.name)}')">🏷️ ${s.name} <span style="color:#64748b;font-size:11px">(${s.test_count})</span></button>`
-            ).join('');
+            tagBtns.innerHTML = tagData.tag_suites.map(s => {
+                const tagRunId = 'runtag-' + s.name.replace(/[^a-z0-9]/gi,'');
+                const testsHtml = (s.tests && s.tests.length)
+                    ? s.tests.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b">
+                        <span style="font-size:13px">${escH(t)}</span>
+                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();runSingleTest('${escH(t)}')" title="Run this test">▶</button>
+                    </div>`).join('')
+                    : '<div style="color:#475569;font-size:12px;padding:8px 0">No tests with this tag.</div>';
+                return `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:10px;overflow:hidden;width:100%">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#1a2332;cursor:pointer" onclick="document.getElementById('${tagRunId}').style.display=document.getElementById('${tagRunId}').style.display==='none'?'block':'none'">
+                        <span style="font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏷️ ${escH(s.name)} <span style="color:#64748b;font-weight:normal">(${s.test_count} tests)</span></span>
+                        <div style="display:flex;gap:8px;align-items:center;flex:none">
+                            <button class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();runByTagFromRun('${escH(s.name)}')">▶ Run Suite</button>
+                            <span style="color:#64748b">▼</span>
+                        </div>
+                    </div>
+                    <div id="${tagRunId}" style="display:none;padding:8px 16px">${testsHtml}</div>
+                </div>`;
+            }).join('');
         } else {
             tagSection.style.display = 'none';
         }
@@ -1652,10 +2141,10 @@ async function loadSuites() {
         for (const [suite, tests] of Object.entries(suites)) {
             const suiteId = 'suite-' + suite.replace(/[^a-z0-9]/gi,'');
             html += `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:10px;overflow:hidden">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1a2332;cursor:pointer" onclick="document.getElementById('${suiteId}').style.display=document.getElementById('${suiteId}').style.display==='none'?'block':'none'">
-                    <span style="font-weight:600">📦 ${suite} <span style="color:#64748b;font-weight:normal">(${tests.length} tests)</span></span>
-                    <div style="display:flex;gap:8px;align-items:center">
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();runSuite('${suite}')">▶ Run Suite</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#1a2332;cursor:pointer" onclick="document.getElementById('${suiteId}').style.display=document.getElementById('${suiteId}').style.display==='none'?'block':'none'">
+                    <span style="font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📦 ${suite} <span style="color:#64748b;font-weight:normal">(${tests.length} tests)</span></span>
+                    <div style="display:flex;gap:8px;align-items:center;flex:none">
+                        <button class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();runSuite('${suite}')">▶ Run Suite</button>
                         <span style="color:#64748b">▼</span>
                     </div>
                 </div>
@@ -1679,6 +2168,9 @@ async function loadSuites() {
         }
         html += `<div style="margin-top:4px;color:#64748b;font-size:12px">Total: ${data.total} tests across ${Object.keys(suites).length} suites</div>`;
         el.innerHTML = html;
+
+        // Load execution config (profiles, etc.) for Run page dropdowns
+        loadExecutionConfig();
     } catch(e) { console.error(e); }
 }
 
@@ -1704,6 +2196,7 @@ function pollProgress(statusEl, onDone) {
                 if (statusEl) statusEl.innerHTML = html;
             } else if (!d.is_running) {
                 clearInterval(poll);
+                showStopButtons(false);
                 if (onDone) onDone();
             }
         } catch(e) {}
@@ -1713,13 +2206,19 @@ function pollProgress(statusEl, onDone) {
 
 async function runAllTests() {
     const btn = document.getElementById('homeRunBtn');
-    const status = document.getElementById('homeRunStatus') || document.getElementById('runPageStatus');
+    // Write status to whichever page the user is currently on.
+    const onRunPage = document.getElementById('page-run')?.classList.contains('active');
+    const status = (onRunPage ? document.getElementById('runPageStatus') : document.getElementById('homeRunStatus'))
+        || document.getElementById('homeRunStatus') || document.getElementById('runPageStatus');
     if (btn) { btn.disabled=true; btn.textContent='⏳ Running...'; }
     if (status) status.innerHTML = '<span class="spinner"></span> Starting...';
     const agent = getSelectedAgent();
-    const body = agent ? {agent} : null;
+    const parallel = parseInt(document.getElementById('runParallel')?.value || '1');
+    const profile = document.getElementById('runProfile')?.value || '';
+    const body = {agent: agent||undefined, parallel, profile: profile||undefined};
     try {
-        await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+        await fetch('/api/run/advanced', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        showStopButtons(true);
         pollProgress(status, () => {
             if(btn){btn.disabled=false; btn.textContent='▶ Run All Tests';}
             if(status) status.textContent='✅ Done!';
@@ -1735,6 +2234,7 @@ async function runSuite(name) {
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/suite/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    showStopButtons(true);
     pollProgress(status, () => { status.textContent='✅ Done!'; loadResults(); loadHomeResults(); });
 }
 
@@ -1744,6 +2244,7 @@ async function runSingleTest(name) {
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/test/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    showStopButtons(true);
     pollProgress(status, () => { status.textContent='✅ Done: '+name; loadResults(); loadHomeResults(); });
 }
 
@@ -1753,6 +2254,7 @@ async function runByTagFromRun(tagName) {
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/tag/'+encodeURIComponent(tagName), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    showStopButtons(true);
     pollProgress(status, () => { status.textContent='✅ Done: '+tagName; loadResults(); loadHomeResults(); });
 }
 
@@ -1776,12 +2278,17 @@ async function loadResults() {
         if(!res.ok) {
             // Only show empty state if we don't have cached results
             if (!_cachedResults) {
-                document.getElementById('resultsTableBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">No results yet. Run tests first.</td></tr>';
+                document.getElementById('resultsTableBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">No results yet. Go to <strong>▶️ Run Tests</strong> to run your tests — or <strong>📝 Test Cases</strong> first if you haven\'t created any.</td></tr>';
             }
             return;
         }
         const data = await res.json();
         _cachedResults = data;
+
+        // Demo banner — these are the bundled example results, not the user's.
+        if (data.is_demo && runBanner && !statusData.is_running) {
+            runBanner.innerHTML = '<div class="alert alert-info" style="margin-bottom:12px">📦 <strong>Example results</strong> — these are bundled demos so you can explore every test type. Run your own tests to replace them, or hide them in <a onclick="showPage(\'settings\')" style="color:#4f8cff;cursor:pointer">⚙️ Settings → Demo &amp; Example Data</a>.</div>';
+        }
 
         // Populate agent filter
         const agents = [...new Set((data.results||[]).map(r => r.agent||'default'))];
@@ -1817,38 +2324,68 @@ async function clearResults() {
 }
 
 async function loadHomeResults() {
+    // Workspace counts (agents / test cases / suites / runs) — independent of results.
+    loadHomeCounts();
     try {
         const res = await fetch('/api/results'); if(!res.ok) return;
         const data = await res.json();
         document.getElementById('c-total').textContent = data.total||0;
         document.getElementById('c-passed').textContent = data.passed||0;
         document.getElementById('c-failed').textContent = data.failed||0;
+        const errEl = document.getElementById('c-errors');
+        if (errEl) errEl.textContent = data.errors||0;
         const rate = data.total>0 ? Math.round((data.passed/data.total)*100) : 0;
         const rateEl = document.getElementById('c-rate');
         rateEl.textContent = rate+'%';
-        rateEl.style.color = rate>=80?'#22c55e':rate>=50?'#eab308':'#ef4444';
+        rateEl.style.color = rate>=80?'#34d399':rate>=50?'#fbbf24':'#f87171';
         document.getElementById('c-duration').textContent = (data.duration_seconds||0).toFixed(1)+'s';
-        renderResultsTable(data, 'homeTableBody', false);
+        const totalCost = (data.total_cost||0);
+        document.getElementById('c-cost').textContent = totalCost > 0 ? '$'+totalCost.toFixed(4) : '$0';
+        renderResultsTable(data, 'homeTableBody', false, 8);
     } catch(e) {}
 }
 
-function renderResultsTable(data, tbodyId, detailed) {
-    const results = data.results||[];
+// Populate the dashboard's workspace overview counts.
+async function loadHomeCounts() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    try {
+        const [agentsRes, tcRes, suitesRes, runsRes] = await Promise.all([
+            fetch('/api/agents/current').catch(()=>null),
+            fetch('/api/testcases').catch(()=>null),
+            fetch('/api/suites').catch(()=>null),
+            fetch('/api/runs').catch(()=>null),
+        ]);
+        if (agentsRes && agentsRes.ok) { const d = await agentsRes.json(); set('c-agents', (d.agents||[]).length); }
+        if (tcRes && tcRes.ok) { const d = await tcRes.json(); set('c-testcases', d.total != null ? d.total : (d.test_cases||[]).length); }
+        if (suitesRes && suitesRes.ok) { const d = await suitesRes.json(); set('c-suites', (d.file_suites||[]).length + (d.tag_suites||[]).length); }
+        if (runsRes && runsRes.ok) { const d = await runsRes.json(); set('c-runs', (d.runs||[]).length); }
+    } catch(e) {}
+}
+
+function renderResultsTable(data, tbodyId, detailed, limit) {
+    const allResults = data.results||[];
+    const results = (limit && allResults.length > limit) ? allResults.slice(0, limit) : allResults;
     const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = results.map((r,i) => {
-        const icon = r.status==='passed'?'✅':r.status==='failed'?'❌':'⚠️';
-        const cls = r.status==='passed'?'status-pass':r.status==='failed'?'status-fail':'status-error';
+        const statusText = r.status==='passed'?'Passed':r.status==='failed'?'Failed':'Error';
+        const statusBg = r.status==='passed'?'#22c55e20':r.status==='failed'?'#ef444420':'#eab30820';
+        const statusFg = r.status==='passed'?'#22c55e':r.status==='failed'?'#ef4444':'#eab308';
+        const statusIcon = r.status==='passed'?'✅':r.status==='failed'?'❌':'⚠️';
+        const statusPill = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;background:${statusBg};color:${statusFg}">${statusIcon} ${statusText}</span>`;
 
-        // Render scores as colored badges with backend indicator
-        let scores='—';
-        if(r.scores && Object.keys(r.scores).length > 0){
-            scores = Object.entries(r.scores).map(([n,v])=>{
-                const bg = v.passed ? '#22c55e20' : '#ef444420';
-                const fg = v.passed ? '#22c55e' : '#ef4444';
-                const backend = v.backend || 'builtin';
-                const prefix = backend === 'deepeval' ? '🧪' : backend === 'azure' ? '☁️' : '';
-                return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:${bg};color:${fg};margin:1px 3px">${prefix}${n}: ${v.score.toFixed(2)}</span>`;
-            }).join('');
+        // Render scores as a single compact summary pill (full breakdown is in
+        // the expandable detail row). Keeps the table column narrow.
+        let scores='<span style="color:#475569;font-size:12px">—</span>';
+        const scoreEntries = r.scores ? Object.entries(r.scores) : [];
+        if (scoreEntries.length > 0) {
+            const passed = scoreEntries.filter(([,v])=>v.passed).length;
+            const avg = scoreEntries.reduce((s,[,v])=>s+(v.score||0),0)/scoreEntries.length;
+            const allPass = passed === scoreEntries.length;
+            const fg = allPass ? '#22c55e' : (passed===0 ? '#ef4444' : '#eab308');
+            const bg = allPass ? '#22c55e20' : (passed===0 ? '#ef444420' : '#eab30820');
+            const tip = scoreEntries.map(([n,v])=>`${n}: ${v.score.toFixed(2)}`).join(', ');
+            scores = `<span style="display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${bg};color:${fg};white-space:nowrap" title="${tip}">`
+                + `${avg.toFixed(2)} avg <span style="opacity:.7;font-weight:normal">·</span> ${passed}/${scoreEntries.length} ✓</span>`;
         }
 
         let asserts='';
@@ -1867,22 +2404,39 @@ function renderResultsTable(data, tbodyId, detailed) {
             </div>`;
         }
 
-        // Show scores detail
+        // Show scores detail — compact responsive grid so it stays readable
+        // even with 30+ evaluators. Failed evaluators are sorted first and
+        // their full reasons are surfaced in the callout section below; here
+        // every evaluator's reason is available on hover.
         if(r.scores && Object.keys(r.scores).length > 0) {
-            detailContent += '<div style="padding:10px 14px;background:#1e293b;border-radius:6px;margin-bottom:8px"><div style="font-size:13px;color:#cbd5e1;margin-bottom:8px;font-weight:600">Evaluation Scores:</div>';
-            for(const [n,v] of Object.entries(r.scores)) {
-                const bar = Math.round(v.score * 100);
+            const sEntries = Object.entries(r.scores);
+            const sPass = sEntries.filter(([,v])=>v.passed).length;
+            const sAvg = sEntries.reduce((a,[,v])=>a+(v.score||0),0)/sEntries.length;
+            // Failed first (lowest score first) so the important ones lead.
+            sEntries.sort((a,b)=> (a[1].passed===b[1].passed) ? (a[1].score-b[1].score) : (a[1].passed?1:-1));
+            const bkColors = {deepeval:'#f97316', azure:'#3b82f6', builtin:'#64748b'};
+            detailContent += '<div style="padding:10px 14px;background:#1e293b;border-radius:6px;margin-bottom:8px">'
+                + `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                    <span style="font-size:13px;color:#cbd5e1;font-weight:600">Evaluation Scores (${sEntries.length})</span>
+                    <span style="font-size:12px;color:#94a3b8">${sPass} ✓ · ${sEntries.length-sPass} ✗ · avg <strong style="color:#cbd5e1">${sAvg.toFixed(2)}</strong></span>
+                  </div>`
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">';
+            for(const [n,v] of sEntries) {
+                const bar = Math.max(2, Math.round(v.score * 100));
                 const color = v.passed ? '#22c55e' : '#ef4444';
                 const bk = v.backend || 'builtin';
-                const bkLabel = bk === 'deepeval' ? '<span style="color:#f97316;font-size:10px">🧪DE</span> ' : bk === 'azure' ? '<span style="color:#3b82f6;font-size:10px">☁️AZ</span> ' : '';
-                detailContent += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                    <span style="width:160px;font-size:13px;color:#cbd5e1;font-weight:500">${bkLabel}${n}</span>
-                    <div style="flex:1;height:8px;background:#334155;border-radius:4px"><div style="width:${bar}%;height:100%;background:${color};border-radius:4px"></div></div>
-                    <span style="font-size:13px;font-weight:600;color:${color};min-width:40px">${v.score.toFixed(2)}</span>
-                </div>
-                ${v.reason ? '<div style="margin-left:168px;margin-bottom:6px;font-size:12px;color:#e2e8f0;line-height:1.5">' + v.reason + '</div>' : ''}`;
+                const bkLabel = (bk === 'deepeval' || bk === 'azure')
+                    ? `<span style="color:${bkColors[bk]};font-size:9px;font-weight:700;letter-spacing:.3px">${bk==='deepeval'?'DE':'AZ'}</span> ` : '';
+                const tip = (v.reason ? n + ': ' + v.reason : n).replace(/"/g,'&quot;');
+                detailContent += `<div title="${tip}" style="background:#0f172a;border:1px solid #334155;border-left:3px solid ${color};border-radius:6px;padding:6px 9px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px">
+                        <span style="font-size:12px;color:#e2e8f0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${bkLabel}${n}</span>
+                        <span style="font-size:12px;font-weight:700;color:${color};flex:none">${v.score.toFixed(2)}</span>
+                    </div>
+                    <div style="height:5px;background:#334155;border-radius:3px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${color}"></div></div>
+                </div>`;
             }
-            detailContent += '</div>';
+            detailContent += '</div></div>';
         }
 
         // Show failed scores with reasons inline
@@ -1918,6 +2472,35 @@ function renderResultsTable(data, tbodyId, detailed) {
             detailContent += '</div>';
         }
 
+        // Show routing path (multi-agent orchestrator)
+        if(r.routing_path && r.routing_path.length > 0) {
+            detailContent += `<div style="padding:8px 12px;background:#1e293b;border-radius:6px;margin-bottom:8px">
+                <div style="font-size:11px;color:#a78bfa;margin-bottom:6px">🔀 Routing Path:</div>
+                <div style="font-size:13px;color:#c4b5fd">${r.routing_path.join(' → ')}</div>
+                ${r.handled_by ? '<div style="font-size:12px;color:#94a3b8;margin-top:4px">Handled by: <strong style="color:#a78bfa">' + r.handled_by + '</strong></div>' : ''}
+            </div>`;
+        } else if(r.handled_by) {
+            detailContent += `<div style="padding:8px 12px;background:#1e293b;border-radius:6px;margin-bottom:8px">
+                <div style="font-size:11px;color:#a78bfa;margin-bottom:4px">🤖 Handled by:</div>
+                <div style="font-size:13px;color:#c4b5fd">${r.handled_by}</div>
+            </div>`;
+        }
+
+        // Show token usage and cost
+        if(r.token_usage || r.estimated_cost > 0) {
+            let costInfo = '<div style="padding:8px 12px;background:#1e293b;border-radius:6px;margin-bottom:8px"><div style="font-size:11px;color:#22d3ee;margin-bottom:6px">💰 Cost &amp; Tokens:</div><div style="display:flex;gap:16px;flex-wrap:wrap">';
+            if(r.token_usage) {
+                costInfo += `<span style="font-size:12px;color:#94a3b8">Input: <strong style="color:#e2e8f0">${r.token_usage.input_tokens}</strong></span>`;
+                costInfo += `<span style="font-size:12px;color:#94a3b8">Output: <strong style="color:#e2e8f0">${r.token_usage.output_tokens}</strong></span>`;
+                costInfo += `<span style="font-size:12px;color:#94a3b8">Total: <strong style="color:#e2e8f0">${r.token_usage.total_tokens}</strong></span>`;
+            }
+            if(r.estimated_cost > 0) {
+                costInfo += `<span style="font-size:12px;color:#94a3b8">Cost: <strong style="color:#22d3ee">$${r.estimated_cost.toFixed(4)}</strong></span>`;
+            }
+            costInfo += '</div></div>';
+            detailContent += costInfo;
+        }
+
         // Show conversation messages
         if(r.messages && r.messages.length){
             let msgs = '';
@@ -1937,15 +2520,37 @@ function renderResultsTable(data, tbodyId, detailed) {
 
         // Always create expandable section if there's any content
         if (detailed && detailContent) {
-            conv=`<tr><td colspan="7"><div class="conv-trace" id="${id}">${detailContent}</div></td></tr>`;
+            conv=`<tr><td colspan="7" style="padding:0;border:none"><div class="conv-trace" id="${id}">${detailContent}</div></td></tr>`;
         }
 
         // Show error snippet in the scores column for quick visibility
         const errorHint = r.error ? `<span style="color:#ef4444;font-size:11px" title="${r.error}">${r.error.substring(0,50)}${r.error.length>50?'...':''}</span>` : '';
 
         const agentName = r.agent || 'default';
-        return `<tr onclick="document.getElementById('${id}')?.classList.toggle('show')" style="cursor:pointer"><td><strong>${r.scenario}</strong></td><td style="color:#64748b">${r.suite}</td><td style="color:#60a5fa;font-size:12px">${agentName}</td><td class="${cls}">${icon}</td><td style="max-width:400px">${scores || errorHint}</td>${detailed?asserts:''}<td style="color:#94a3b8">${Math.round(r.latency_ms)}ms</td></tr>${conv}`;
+        // Only make rows clickable/expandable on the detailed (Results) view —
+        // the home summary has no expandable detail, so don't show a misleading pointer.
+        const rowAttrs = (detailed && conv)
+            ? `onclick="document.getElementById('${id}')?.classList.toggle('show')" style="cursor:pointer"`
+            : '';
+        const cellEllipsis = 'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        return `<tr ${rowAttrs}>`
+            + `<td><strong>${r.scenario}</strong></td>`
+            + `<td style="color:#94a3b8;${cellEllipsis}" title="${r.suite}">${r.suite}</td>`
+            + `<td style="color:#60a5fa;font-size:12px;${cellEllipsis}" title="${agentName}">${agentName}</td>`
+            + `<td>${statusPill}</td>`
+            + `<td style="max-width:380px">${(r.scores && Object.keys(r.scores).length) ? scores : errorHint || scores}</td>`
+            + `${detailed?asserts:''}`
+            + `<td style="color:#94a3b8;white-space:nowrap">${Math.round(r.latency_ms)}ms</td>`
+            + `</tr>${conv}`;
     }).join('');
+
+    // When the home page is limited, show a "view all" link below the table.
+    if (limit && allResults.length > limit) {
+        const colspan = detailed ? 7 : 6;
+        tbody.innerHTML += `<tr><td colspan="${colspan}" style="text-align:center;padding:12px">`
+            + `<a onclick="showPage('results')" style="color:#3b82f6;cursor:pointer;font-size:13px">`
+            + `View all ${allResults.length} results →</a></td></tr>`;
+    }
 }
 
 // ===== Run History =====
@@ -1965,14 +2570,20 @@ async function loadRunHistory() {
         el.innerHTML = data.runs.map(r => {
             const passRate = r.total > 0 ? Math.round((r.passed/r.total)*100) : 0;
             const color = passRate>=80?'#22c55e':passRate>=50?'#eab308':'#ef4444';
+            const safeName = (r.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const nameLabel = r.name
+                ? `<span style="font-size:13px;font-weight:600;color:#e2e8f0">${r.name}</span>`
+                : `<span style="font-size:13px;color:#94a3b8">${r.id}</span>`;
             return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155">
-                <div>
-                    <span style="font-size:13px">${r.id}</span>
-                    <span style="color:#475569;font-size:11px;margin-left:8px">${r.timestamp ? r.timestamp.substring(0,19) : ''}</span>
+                <div id="runname-${r.id}" style="flex:1">
+                    ${nameLabel}
+                    <span style="color:#475569;font-size:11px;margin-left:8px">${r.timestamp ? r.timestamp.substring(0,19).replace('T',' ') : ''}</span>
+                    ${r.name ? `<span style="color:#475569;font-size:10px;margin-left:6px">(${r.id})</span>` : ''}
                 </div>
                 <div style="display:flex;align-items:center;gap:8px">
                     <span style="font-size:12px;color:${color}">${r.passed}/${r.total} passed (${passRate}%)</span>
                     <span style="color:#475569;font-size:11px">${r.duration.toFixed(1)}s</span>
+                    <button class="btn btn-outline btn-sm" onclick="startRenameRun('${r.id}','${safeName}')" title="Name this run">🏷️</button>
                     <button class="btn btn-outline btn-sm" onclick="loadRunResults('${r.id}')">View</button>
                     <a href="/api/download/report/${r.id}" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#94a3b8">📥</a>
                     <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="deleteRun('${r.id}')">🗑️</button>
@@ -1998,10 +2609,133 @@ async function deleteRun(runId) {
     loadRunHistory();
 }
 
+async function renameRun(runId, currentName) {
+    const name = prompt('Name this run (e.g. "v2 prompt", "baseline"). Leave blank to clear:', currentName || '');
+    if (name === null) return; // cancelled
+    await fetch('/api/runs/'+encodeURIComponent(runId)+'/name', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: name.trim()})
+    });
+    loadRunHistory();
+}
+
+// Inline rename: swaps the name area for an input with Save/Cancel (no native dialog)
+function startRenameRun(runId, currentName) {
+    const container = document.getElementById('runname-' + runId);
+    if (!container) return;
+    const val = (currentName || '').replace(/&quot;/g, '"');
+    container.innerHTML =
+        `<input id="rninput-${runId}" type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="Enter a name (e.g. baseline v1)" `
+        + `style="width:auto;min-width:200px;margin:0;padding:4px 8px;font-size:13px" `
+        + `onkeydown="if(event.key==='Enter'){saveRenameRun('${runId}')} if(event.key==='Escape'){loadRunHistory()}">`
+        + `<button class="btn btn-primary btn-sm" style="margin-left:6px" onclick="saveRenameRun('${runId}')">Save</button>`
+        + `<button class="btn btn-outline btn-sm" style="margin-left:4px" onclick="loadRunHistory()">Cancel</button>`;
+    const input = document.getElementById('rninput-' + runId);
+    if (input) { input.focus(); input.select(); }
+}
+
+async function saveRenameRun(runId) {
+    const input = document.getElementById('rninput-' + runId);
+    const name = input ? input.value.trim() : '';
+    try {
+        await fetch('/api/runs/'+encodeURIComponent(runId)+'/name', {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name})
+        });
+    } catch(e) { console.error('rename failed', e); }
+    loadRunHistory();
+}
+
 async function deleteAllRuns() {
     if (!confirm('Delete ALL run history? This cannot be undone.')) return;
     await fetch('/api/runs', {method:'DELETE'});
     loadRunHistory();
+}
+
+// ===== Compare Runs =====
+async function toggleComparePanel() {
+    const panel = document.getElementById('comparePanel');
+    panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+    if (panel.style.display==='none') return;
+    try {
+        const data = await (await fetch('/api/runs')).json();
+        const runs = data.runs || [];
+        if (runs.length < 2) {
+            document.getElementById('compareResults').innerHTML =
+                '<div style="color:#475569;padding:8px">Need at least 2 saved runs to compare. Run tests a few times first.</div>';
+        }
+        const opts = runs.map(r => {
+            const ts = r.timestamp ? r.timestamp.substring(0,19).replace('T',' ') : r.id;
+            const rate = r.total>0 ? Math.round((r.passed/r.total)*100) : 0;
+            // Prefer the friendly name; fall back to timestamp
+            const label = r.name ? `${r.name} — ${ts}` : ts;
+            return `<option value="${r.id}">${label} — ${r.passed}/${r.total} (${rate}%)</option>`;
+        }).join('');
+        const selA = document.getElementById('compareRunA');
+        const selB = document.getElementById('compareRunB');
+        selA.innerHTML = opts;
+        selB.innerHTML = opts;
+        // Default: A = older (second), B = newest (first)
+        if (runs.length >= 2) { selA.selectedIndex = 1; selB.selectedIndex = 0; }
+    } catch(e) { console.error(e); }
+}
+
+async function runComparison() {
+    const a = document.getElementById('compareRunA').value;
+    const b = document.getElementById('compareRunB').value;
+    const el = document.getElementById('compareResults');
+    if (!a || !b) { el.innerHTML = '<div style="color:#ef4444">Select two runs.</div>'; return; }
+    if (a === b) { el.innerHTML = '<div style="color:#eab308">Pick two different runs.</div>'; return; }
+    el.innerHTML = '<span class="spinner"></span> Comparing...';
+    try {
+        const data = await (await fetch(`/api/compare?run_a=${encodeURIComponent(a)}&run_b=${encodeURIComponent(b)}`)).json();
+        if (data.error) { el.innerHTML = `<div style="color:#ef4444">${data.error}</div>`; return; }
+
+        const badge = (change) => {
+            const map = {
+                improved: ['#22c55e','🟢 Fixed'],
+                regressed: ['#ef4444','🔴 Regressed'],
+                new: ['#3b82f6','🆕 New'],
+                removed: ['#64748b','➖ Removed'],
+                same: ['#64748b','—'],
+            };
+            const [c,t] = map[change] || ['#64748b', change];
+            return `<span style="color:${c};font-size:12px">${t}</span>`;
+        };
+        const statusIcon = (s) => s==='passed'?'✅':s==='failed'?'❌':s==='error'?'⚠️':s==='missing'?'·':s;
+
+        let html = `<div style="display:flex;gap:18px;margin-bottom:12px;font-size:13px">
+            <span style="color:#22c55e">🟢 ${data.improved} fixed</span>
+            <span style="color:#ef4444">🔴 ${data.regressed} regressed</span>
+            <span style="color:#64748b">${data.total_tests} tests compared</span>
+        </div>`;
+
+        // Sort: regressions first, then fixed, then new/removed, then same
+        const order = {regressed:0, new:1, fixed:2, improved:2, removed:3, same:4};
+        const rows = [...data.comparisons].sort((x,y)=>(order[x.change]??9)-(order[y.change]??9));
+
+        html += '<div class="table-wrap"><table><thead><tr><th>Test</th><th>Agent</th><th>A</th><th>B</th><th>Change</th><th>Score Δ</th></tr></thead><tbody>';
+        for (const c of rows) {
+            const scoreDeltas = (c.scores||[])
+                .filter(s => s.diff !== null && s.diff !== undefined && s.diff !== 0)
+                .map(s => {
+                    const col = s.diff > 0 ? '#22c55e' : '#ef4444';
+                    const sign = s.diff > 0 ? '+' : '';
+                    return `<span style="color:${col};font-size:11px;margin-right:6px">${s.metric} ${sign}${s.diff}</span>`;
+                }).join('');
+            const rowBg = c.change==='regressed' ? 'background:#ef444410' : c.change==='improved' ? 'background:#22c55e10' : '';
+            html += `<tr style="${rowBg}">
+                <td>${c.name}</td>
+                <td style="color:#64748b;font-size:12px">${c.agent}</td>
+                <td>${statusIcon(c.status_a)}</td>
+                <td>${statusIcon(c.status_b)}</td>
+                <td>${badge(c.change)}</td>
+                <td>${scoreDeltas || '<span style="color:#475569">—</span>'}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+        el.innerHTML = html;
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
 }
 
 // ===== Settings =====
@@ -2028,28 +2762,81 @@ async function saveSettings() {
     } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
 }
 
+// ===== Demo / Example Data =====
+async function loadDemoStatus() {
+    const el = document.getElementById('demoStatus');
+    if (!el) return;
+    try {
+        const d = await (await fetch('/api/demo/status')).json();
+        if (d.has_real_results) {
+            el.innerHTML = '<div class="alert alert-info" style="margin:0">You have your own results — demo data is not showing.</div>';
+        } else if (d.demo_showing) {
+            el.innerHTML = '<div class="alert alert-info" style="margin:0">📦 Demo data is currently showing on the Results page.</div>';
+        } else if (d.dismissed) {
+            el.innerHTML = '<div class="alert alert-success" style="margin:0">✅ Demo data is hidden. Your workspace is clean.</div>';
+        } else {
+            el.innerHTML = '';
+        }
+    } catch(e) {}
+}
+
+async function removeDemoData() {
+    if (!confirm('Hide the bundled demo/example results? This does not delete any tests or results you created.')) return;
+    const alert = document.getElementById('demoAlert');
+    try {
+        const d = await (await fetch('/api/demo/remove', {method:'POST'})).json();
+        alert.innerHTML = `<div class="alert alert-success">✅ ${d.message}</div>`;
+        // Clear the cached demo view so the Results page reflects the clean slate.
+        _cachedResults = null;
+        const tb = document.getElementById('resultsTableBody');
+        if (tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">Clean slate — no results yet. Go to <strong>▶️ Run Tests</strong> to run your tests.</td></tr>';
+        const hb = document.getElementById('homeTableBody');
+        if (hb) hb.innerHTML = '';
+        const banner = document.getElementById('resultsRunBanner');
+        if (banner) banner.innerHTML = '';
+        loadDemoStatus(); loadHomeResults();
+        setTimeout(()=>{ alert.innerHTML=''; }, 4000);
+    } catch(e) { alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function restoreDemoData() {
+    const alert = document.getElementById('demoAlert');
+    try {
+        const d = await (await fetch('/api/demo/restore', {method:'POST'})).json();
+        alert.innerHTML = `<div class="alert alert-success">✅ ${d.message}</div>`;
+        _cachedResults = null;
+        loadDemoStatus(); loadHomeResults();
+        setTimeout(()=>{ alert.innerHTML=''; }, 4000);
+    } catch(e) { alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
 async function loadConfigDisplay() {
     try {
         // Load config
         const res = await fetch('/api/config');
         const data = await res.json();
 
-        // Load actual key values for pre-filling
+        // Load key status (masked only — raw secret never sent to browser)
         const keysRes = await fetch('/api/settings/keys');
         const keys = await keysRes.json();
 
-        // Pre-fill key fields with actual values (shown as password dots)
-        if (keys.azure_api_key) {
-            document.getElementById('set-azure-key').value = keys.azure_api_key;
-        }
-        if (keys.openai_api_key) {
-            document.getElementById('set-openai-key').value = keys.openai_api_key;
-        }
+        // Show masked key as placeholder; keep input EMPTY so the secret is
+        // not held in the DOM and "save blank" means "keep existing key".
+        const azInput = document.getElementById('set-azure-key');
+        const oaInput = document.getElementById('set-openai-key');
+        azInput.value = '';
+        oaInput.value = '';
+        azInput.placeholder = keys.has_azure_key
+            ? 'Key set: ' + keys.azure_api_key_masked + ' — paste a new key to replace'
+            : 'Paste your Azure API key here';
+        oaInput.placeholder = keys.has_openai_key
+            ? 'Key set: ' + keys.openai_api_key_masked + ' — paste a new key to replace'
+            : 'sk-... (optional — skip if using Azure)';
 
         // Show key status banner
         const statusEl = document.getElementById('settingsKeyStatus');
         if (keys.has_azure_key) {
-            statusEl.innerHTML = '<div class="alert alert-success">🔑 Azure API Key is set. Click 👁 to view, or paste a new key to update.</div>';
+            statusEl.innerHTML = '<div class="alert alert-success">🔑 Azure API Key is set. Paste a new key below to update it.</div>';
         } else if (data.has_entra_id) {
             statusEl.innerHTML = '<div class="alert alert-success">🔐 Azure Entra ID active (keyless auth via az login). No API key needed.</div>';
         } else {
@@ -2075,7 +2862,181 @@ async function loadConfigDisplay() {
     } catch(e) { console.error('loadConfigDisplay error:', e); }
 }
 
+// ===== Cancel / Stop =====
+async function cancelRun() {
+    try {
+        const res = await fetch('/api/run/cancel', {method:'POST'});
+        const data = await res.json();
+        // Update all stop buttons and status areas
+        document.querySelectorAll('#runStopBtn, #baselineStopBtn, #homeStopBtn').forEach(b => {
+            b.textContent = '⏳ Stopping...';
+            b.disabled = true;
+        });
+        const statusEls = [document.getElementById('runPageStatus'), document.getElementById('baselineAlert'), document.getElementById('homeRunStatus')];
+        statusEls.forEach(el => {
+            if (el) el.innerHTML = '<span style="color:#fbbf24">⏳ ' + data.message + '</span>';
+        });
+    } catch(e) { console.error('Cancel error:', e); }
+}
+
+function showStopButtons(show) {
+    document.querySelectorAll('#runStopBtn, #baselineStopBtn, #homeStopBtn').forEach(b => {
+        b.style.display = show ? 'inline-flex' : 'none';
+        b.textContent = '⏹ Stop';
+        b.disabled = false;
+    });
+}
+
+// ===== Baseline Management =====
+async function loadBaselineList() {
+    try {
+        const res = await fetch('/api/baseline/list');
+        const data = await res.json();
+        const el = document.getElementById('baselineList');
+        if (!data.baselines || data.baselines.length === 0) {
+            el.innerHTML = '<div style="color:#475569;padding:16px;text-align:center">No baselines saved yet. Click "Save New Baselines" to snapshot current agent responses.</div>';
+            return;
+        }
+        el.innerHTML = `<div style="margin-bottom:8px;font-size:13px;color:#94a3b8">${data.total} baseline(s) saved</div>` +
+            data.baselines.map(b => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #334155">
+                <div>
+                    <div style="font-weight:600;font-size:14px">${b.scenario}</div>
+                    <div style="font-size:12px;color:#64748b">Agent: ${b.agent} ${b.has_tool_calls ? '· 🔧 has tool calls' : ''}</div>
+                    <div style="font-size:11px;color:#475569;margin-top:2px">${b.content_preview}</div>
+                </div>
+            </div>`).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function saveBaselines() {
+    const el = document.getElementById('baselineAlert');
+    el.innerHTML = '<span class="spinner"></span> Running tests and saving baselines...';
+    try {
+        const res = await fetch('/api/baseline/save', {method:'POST'});
+        const data = await res.json();
+        if (res.ok) {
+            showStopButtons(true);
+            // Poll until done
+            const poll = setInterval(async () => {
+                const s = await (await fetch('/api/status')).json();
+                if (!s.is_running) {
+                    clearInterval(poll);
+                    showStopButtons(false);
+                    const count = s.baseline_saved || '';
+                    el.innerHTML = `<div style="color:#22c55e;padding:8px;background:#22c55e15;border-radius:6px">✅ ${count ? count + ' baselines' : 'Baselines'} saved!</div>`;
+                    loadBaselineList();
+                    setTimeout(() => el.innerHTML = '', 5000);
+                }
+            }, 1500);
+        } else {
+            el.innerHTML = `<div style="color:#ef4444">${data.error}</div>`;
+        }
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+async function diffBaselines() {
+    const el = document.getElementById('baselineAlert');
+    el.innerHTML = '<span class="spinner"></span> Running baseline comparison...';
+    try {
+        await fetch('/api/baseline/diff', {method:'POST'});
+        showStopButtons(true);
+        const poll = setInterval(async () => {
+            const s = await (await fetch('/api/status')).json();
+            if (!s.is_running) {
+                clearInterval(poll);
+                showStopButtons(false);
+                el.innerHTML = '';
+                // Read diffs from the status response directly
+                const diffs = s.baseline_diffs;
+                const section = document.getElementById('baselineDiffSection');
+                const diffEl = document.getElementById('baselineDiffResults');
+                if (diffs && diffs.length > 0) {
+                    section.style.display = 'block';
+                    const changes = diffs.filter(d => d.status === 'changed').length;
+                    const matches = diffs.filter(d => d.status === 'match').length;
+                    let html = `<div style="margin-bottom:12px;font-size:13px">
+                        <span style="color:#22c55e">✅ ${matches} match</span> · 
+                        <span style="color:#ef4444">🔄 ${changes} changed</span> · 
+                        <span style="color:#64748b">⏭️ ${diffs.filter(d=>d.status==='no_baseline').length} no baseline</span>
+                    </div>`;
+                    html += diffs.map(d => {
+                        const icon = d.status === 'match' ? '✅' : d.status === 'changed' ? '🔄' : '⏭️';
+                        const color = d.status === 'match' ? '#22c55e' : d.status === 'changed' ? '#ef4444' : '#64748b';
+                        let detail = '';
+                        if (d.status === 'changed') {
+                            detail = `<div style="font-size:12px;color:#fca5a5;margin-top:4px;white-space:pre-wrap">${d.details||''}</div>`;
+                            const badges = [];
+                            if (d.content_match === false) badges.push('<span style="background:#ef444420;color:#ef4444;padding:2px 6px;border-radius:3px;font-size:10px">content</span>');
+                            if (d.tool_calls_match === false) badges.push('<span style="background:#f9731620;color:#f97316;padding:2px 6px;border-radius:3px;font-size:10px">tools</span>');
+                            if (d.routing_match === false) badges.push('<span style="background:#a78bfa20;color:#a78bfa;padding:2px 6px;border-radius:3px;font-size:10px">routing</span>');
+                            if (badges.length) detail = '<div style="margin-top:4px">' + badges.join(' ') + '</div>' + detail;
+                        }
+                        return `<div style="padding:8px 0;border-bottom:1px solid #334155">
+                            <span style="color:${color}">${icon}</span> <strong>${d.scenario}</strong> <span style="color:#64748b;font-size:12px">(${d.agent})</span>
+                            ${detail}
+                        </div>`;
+                    }).join('');
+                    diffEl.innerHTML = html;
+                } else {
+                    section.style.display = 'block';
+                    diffEl.innerHTML = '<div style="color:#475569">No comparison data available.</div>';
+                }
+            }
+        }, 1500);
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+async function clearBaselines() {
+    if (!confirm('Delete all saved baselines?')) return;
+    await fetch('/api/baseline', {method:'DELETE'});
+    document.getElementById('baselineAlert').innerHTML = '<div style="color:#22c55e;padding:8px">✅ Baselines cleared.</div>';
+    loadBaselineList();
+    setTimeout(() => document.getElementById('baselineAlert').innerHTML = '', 3000);
+}
+
+// ===== Execution Settings =====
+async function loadExecutionConfig() {
+    try {
+        const res = await fetch('/api/execution-config');
+        const data = await res.json();
+        document.getElementById('set-cache').value = String(data.cache_responses);
+        document.getElementById('set-rate-limit').value = data.rate_limit || 0;
+        document.getElementById('set-max-cost').value = data.max_eval_cost_per_run || 5;
+        document.getElementById('set-foundry-upload').value = String(data.foundry_upload);
+
+        // Populate profiles in Run page dropdown
+        const profileSelect = document.getElementById('runProfile');
+        if (profileSelect && data.profiles) {
+            // Keep default option, add profiles
+            profileSelect.innerHTML = '<option value="">Default</option>' +
+                data.profiles.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+    } catch(e) { console.error('loadExecutionConfig error:', e); }
+}
+
+async function saveExecutionSettings() {
+    const el = document.getElementById('execSettingsAlert');
+    const body = {
+        cache_responses: document.getElementById('set-cache').value === 'true',
+        rate_limit: parseFloat(document.getElementById('set-rate-limit').value) || 0,
+        max_eval_cost_per_run: parseFloat(document.getElementById('set-max-cost').value) || 5,
+        foundry_upload: document.getElementById('set-foundry-upload').value === 'true',
+    };
+    try {
+        const res = await fetch('/api/settings/execution', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        el.innerHTML = `<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ ${data.message}</div>`;
+        setTimeout(() => el.innerHTML = '', 3000);
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
 // ===== Init =====
+(function initGreeting() {
+    const h = new Date().getHours();
+    const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    const el = document.getElementById('homeGreeting');
+    if (el) el.textContent = greet + ' — welcome to ATTEST';
+})();
 loadHomeResults();
 </script>
 </body>

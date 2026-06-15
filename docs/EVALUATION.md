@@ -2,7 +2,20 @@
 
 ## Overview
 
-ATTEST provides 32 evaluators across 3 backends. Evaluators use LLM-as-judge to score agent responses on a 0.0-1.0 scale.
+ATTEST provides 36 evaluators across 4 backends. Evaluators use LLM-as-judge to score agent responses on a 0.0-1.0 scale.
+
+### Which evaluator should I use?
+
+| If you want to check… | Start with |
+|---|---|
+| The answer is correct & on-topic | `correctness`, `relevancy` |
+| It didn't make things up (with `context`) | `deepeval_faithfulness`, `groundedness` |
+| It's safe (no toxicity, bias, harm) | `deepeval_toxicity`, `deepeval_bias`, `violence`, `hate_unfairness` |
+| Your RAG retrieval is good | `ragas_faithfulness`, `ragas_context_precision`, `ragas_context_recall` |
+| It called the right tools | `deepeval_tool_correctness`, `tool_call_accuracy` |
+
+> Tip: the **Built-in** backend always works with just your LLM judge. Install DeepEval, Azure,
+> or RAGAS only when you need their extra metrics — uninstalled backends are skipped silently.
 
 ## Evaluator Backends
 
@@ -56,6 +69,16 @@ Microsoft's production evaluation SDK. Install: `pip install azure-ai-evaluation
 | `f1_score` | NLP | F1 score (local, free) |
 | `bleu_score` | NLP | BLEU score (local, free) |
 
+### RAGAS (4 metrics)
+RAG-focused metrics from the RAGAS framework. Install: `pip install ragas langchain-openai`
+
+| Name | Category | What It Checks |
+|------|----------|---------------|
+| `ragas_faithfulness` | RAG | Answer is grounded in the retrieved context |
+| `ragas_answer_relevancy` | RAG | Answer actually addresses the question |
+| `ragas_context_precision` | RAG | Retrieved context is relevant/precise |
+| `ragas_context_recall` | RAG | Context covers the reference answer |
+
 ## Usage in YAML
 
 ```yaml
@@ -101,6 +124,7 @@ registry.register("my_metric", MyEvaluator)
 Plugins auto-register at startup if their package is installed:
 - DeepEval: `pip install deepeval` → 12 metrics available
 - Azure: `pip install azure-ai-evaluation` → 15 metrics available
+- RAGAS: `pip install ragas langchain-openai` → 4 metrics available
 - If not installed, silently skipped — no errors
 
 ## Authentication for Evaluators
@@ -128,6 +152,8 @@ AZURE_API_BASE=https://your-resource.openai.azure.com
 
 **Azure AI evaluators (15)**: Auto-build `model_config` from env vars. Support both API key and Entra ID token provider.
 
+**RAGAS evaluators (4)**: Wrap RAGAS metrics with your configured LLM judge and embeddings (via `langchain-openai`). Support both API key and Entra ID.
+
 ## Evaluator Status API
 
 `GET /api/evaluators/status` returns which backends are installed and configured:
@@ -135,6 +161,7 @@ AZURE_API_BASE=https://your-resource.openai.azure.com
 {
   "deepeval": {"installed": true, "configured": true},
   "azure_eval": {"installed": true, "configured": true},
+  "ragas": {"installed": true, "configured": true},
   "builtin": {"installed": true, "configured": true}
 }
 ```
@@ -147,6 +174,6 @@ Each evaluator produces an `EvalScore` with:
 - `score`: 0.0-1.0 normalized
 - `passed`: Above threshold?
 - `reason`: LLM explanation
-- `backend`: "builtin", "deepeval", or "azure"
+- `backend`: "builtin", "deepeval", "azure", or "ragas"
 
-Results display in the dashboard with backend indicators (🧪 DeepEval, ☁️ Azure).
+Results display in the dashboard with backend indicators (🧪 DeepEval, ☁️ Azure, 🔬 RAGAS).

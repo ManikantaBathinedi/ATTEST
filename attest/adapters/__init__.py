@@ -11,6 +11,13 @@ The create_adapter() factory picks the right adapter based on config type.
 from attest.adapters.base import BaseAgentAdapter, AgentCapabilities
 from attest.adapters.callable_adapter import CallableAgentAdapter
 from attest.adapters.http_rest import HttpAgentAdapter
+from attest.adapters.langchain_adapter import LangChainAgentAdapter
+from attest.adapters.langgraph_adapter import LangGraphAgentAdapter
+from attest.adapters.crewai_adapter import CrewAIAgentAdapter
+from attest.adapters.autogen_adapter import AutoGenAgentAdapter
+from attest.adapters.openai_assistant_adapter import OpenAIAssistantAdapter
+from attest.adapters.mcp_adapter import MCPAgentAdapter
+from attest.adapters.mock_adapter import MockAgentAdapter
 from attest.core.config_models import AgentConfig
 from attest.core.exceptions import ConfigError
 
@@ -28,6 +35,10 @@ def create_adapter(config: AgentConfig) -> BaseAgentAdapter:
         ConfigError if the agent type is not recognized.
     """
     adapter_type = config.type.lower()
+
+    # Mock — offline demo agent (no network / API key)
+    if adapter_type == "mock":
+        return MockAgentAdapter(config.mock)
 
     if adapter_type in ("http", "rest", "http_rest"):
         return HttpAgentAdapter(config)
@@ -58,9 +69,37 @@ def create_adapter(config: AgentConfig) -> BaseAgentAdapter:
             "use CallableAgentAdapter directly in Python code."
         )
 
+    if adapter_type in ("langchain", "langgraph", "crewai", "autogen", "openai_assistant"):
+        adapter_class = {
+            "langchain": "LangChainAgentAdapter",
+            "langgraph": "LangGraphAgentAdapter",
+            "crewai": "CrewAIAgentAdapter",
+            "autogen": "AutoGenAgentAdapter",
+            "openai_assistant": "OpenAIAssistantAdapter",
+        }[adapter_type]
+        raise ConfigError(
+            f"The '{adapter_type}' adapter cannot be created from YAML config — "
+            f"use {adapter_class} directly in Python code (it wraps an in-process "
+            "agent object)."
+        )
+
+    # MCP — can be created from YAML (connects to a server via stdio or sse)
+    if adapter_type == "mcp":
+        if not config.command and not config.endpoint:
+            raise ConfigError(
+                "MCP agent requires 'command' (stdio) or 'endpoint' (sse url)."
+            )
+        return MCPAgentAdapter(
+            command=config.command,
+            args=config.args,
+            url=config.endpoint if config.transport == "sse" else None,
+            default_tool=config.default_tool,
+            input_arg=config.input_arg,
+        )
+
     raise ConfigError(
         f"Unknown agent type: '{config.type}'. "
-        f"Supported types: http, foundry_prompt, foundry_hosted, callable"
+        f"Supported types: mock, http, foundry_prompt, foundry_hosted, callable, mcp"
     )
 
 
@@ -69,5 +108,12 @@ __all__ = [
     "AgentCapabilities",
     "HttpAgentAdapter",
     "CallableAgentAdapter",
+    "LangChainAgentAdapter",
+    "LangGraphAgentAdapter",
+    "CrewAIAgentAdapter",
+    "AutoGenAgentAdapter",
+    "OpenAIAssistantAdapter",
+    "MCPAgentAdapter",
+    "MockAgentAdapter",
     "create_adapter",
 ]

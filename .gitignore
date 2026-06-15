@@ -29,6 +29,9 @@ attest.yaml
 htmlcov/
 .coverage
 reports/
+baselines/
+.deepeval/
+.deepeval_telemetry.txt
 
 # OS
 .DS_Store

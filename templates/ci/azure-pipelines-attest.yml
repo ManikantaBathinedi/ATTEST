@@ -1,0 +1,55 @@
+# ATTEST — Agent Testing & Trust Evaluation Suite
+# Azure DevOps pipeline: runs agent tests and publishes results.
+# Copy to azure-pipelines.yml (or import as a pipeline) in your repo.
+#
+# Define these as pipeline variables (mark secrets as secret):
+#   AZURE_API_KEY    — key for your Foundry agent + Azure evaluators
+#   AZURE_API_BASE   — (optional) Azure OpenAI endpoint for evaluators
+#   OPENAI_API_KEY   — (optional) only if using OpenAI for evaluation
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+pr:
+  branches:
+    include:
+      - "*"
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.11"
+    displayName: Use Python 3.11
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -e ".[azure,deepeval,dashboard]"
+    displayName: Install ATTEST
+
+  - script: |
+      attest run --parallel 4 --quiet
+    displayName: Run ATTEST agent tests
+    env:
+      AZURE_API_KEY: $(AZURE_API_KEY)
+      AZURE_API_BASE: $(AZURE_API_BASE)
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
+    # attest exits non-zero on failure -> the step (and pipeline) fails.
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: reports/junit.xml
+      testRunTitle: ATTEST Agent Tests
+    displayName: Publish JUnit results
+
+  - publish: reports
+    artifact: attest-reports
+    condition: always()
+    displayName: Upload reports

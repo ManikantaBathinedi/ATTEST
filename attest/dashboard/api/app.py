@@ -37,6 +37,7 @@ load_dotenv(".env", override=True)
 
 _latest_summary: Optional[RunSummary] = None
 _is_running: bool = False
+_cancel_requested: bool = False
 _config_path: Optional[str] = None
 _run_progress: Dict[str, Any] = {"total": 0, "completed": 0, "current": "", "results": []}
 
@@ -68,6 +69,15 @@ class AgentSetupRequest(BaseModel):
     request_path: str = "/chat"
     body_key: str = "message"
     response_path: str = "$.response"
+    # Multi-agent orchestrator routing (optional)
+    handled_by_path: Optional[str] = None
+    routing_path_path: Optional[str] = None
+    # MCP-specific
+    transport: str = "stdio"
+    command: Optional[str] = None
+    args: List[str] = []
+    default_tool: Optional[str] = None
+    input_arg: str = "input"
 
 
 class TestCaseRequest(BaseModel):
@@ -125,7 +135,26 @@ async def save_agent(req: AgentSetupRequest):
             "agent_name": req.agent_name,
             "agent_version": req.agent_version or "latest",
         }
+    elif req.type == "mcp":
+        mcp_cfg = {
+            "type": "mcp",
+            "transport": req.transport,
+            "default_tool": req.default_tool,
+            "input_arg": req.input_arg or "input",
+        }
+        if req.transport == "stdio":
+            mcp_cfg["command"] = req.command
+            mcp_cfg["args"] = req.args or []
+        else:
+            mcp_cfg["endpoint"] = req.endpoint
+        data["agents"][req.name] = mcp_cfg
     else:
+        response_cfg = {"content_path": req.response_path}
+        # Multi-agent orchestrator routing fields (only written when provided).
+        if req.handled_by_path:
+            response_cfg["handled_by_path"] = req.handled_by_path
+        if req.routing_path_path:
+            response_cfg["routing_path_path"] = req.routing_path_path
         data["agents"][req.name] = {
             "type": "http",
             "endpoint": req.endpoint,
@@ -133,7 +162,7 @@ async def save_agent(req: AgentSetupRequest):
                 "path": req.request_path,
                 "body_template": {req.body_key: "{{input}}"},
             },
-            "response": {"content_path": req.response_path},
+            "response": response_cfg,
         }
 
     # Ensure other sections exist
@@ -311,6 +340,14 @@ async def evaluator_availability():
     except ImportError:
         pass
 
+    # Check RAGAS
+    ragas_installed = False
+    try:
+        import ragas
+        ragas_installed = True
+    except ImportError:
+        pass
+
     # Check Azure credentials for DeepEval
     has_azure_keys = bool(
         os.environ.get("AZURE_API_BASE")
@@ -328,6 +365,11 @@ async def evaluator_availability():
             "installed": azure_eval_installed,
             "configured": azure_eval_installed,
             "message": "" if azure_eval_installed else "pip install azure-ai-evaluation",
+        },
+        "ragas": {
+            "installed": ragas_installed,
+            "configured": ragas_installed and (has_azure_keys or has_openai_key),
+            "message": "" if ragas_installed else "pip install ragas langchain-openai",
         },
         "builtin": {
             "installed": True,
@@ -1017,15 +1059,23 @@ async def move_test_to_suite(data: dict):
 async def get_status():
     return {
         "is_running": _is_running,
+        "cancel_requested": _cancel_requested,
         "has_results": _latest_summary is not None or Path("reports/results.json").exists(),
         "config_loaded": _get_config_path().exists(),
         "progress": _run_progress if _is_running else None,
+        "baseline_diffs": _run_progress.get("baseline_diffs"),
+        "baseline_saved": _run_progress.get("baseline_saved"),
     }
 
 
 @app.get("/api/results")
 async def get_results():
-    """Get the latest results — always reads from file for freshness."""
+    """Get the latest results — always reads from file for freshness.
+
+    When the user has no real results yet, fall back to the bundled example
+    results (flagged ``is_demo``) so the Results page isn't empty on first
+    launch. The user can hide them with the "Remove Demo Data" button.
+    """
     results_path = Path("reports/results.json")
     if results_path.exists():
         try:
@@ -1034,7 +1084,64 @@ async def get_results():
         except Exception:
             pass
 
+    # Fallback: bundled demo results (unless the user dismissed them).
+    if not _demo_dismissed_flag().exists():
+        demo = _demo_results_path()
+        if demo.exists():
+            try:
+                data = json.loads(demo.read_text(encoding="utf-8"))
+                data["is_demo"] = True
+                return data
+            except Exception:
+                pass
+
     return JSONResponse({"error": "No results yet. Run tests first."}, status_code=404)
+
+
+def _demo_results_path() -> Path:
+    """Path to the bundled example results that ship with the package."""
+    return Path(__file__).resolve().parent.parent / "demo_results.json"
+
+
+def _demo_dismissed_flag() -> Path:
+    """Marker file written when the user clicks 'Remove Demo Data'."""
+    return Path("reports") / ".demo_dismissed"
+
+
+@app.get("/api/demo/status")
+async def demo_status():
+    """Report whether demo data is available and currently showing."""
+    has_real = Path("reports/results.json").exists()
+    dismissed = _demo_dismissed_flag().exists()
+    demo_available = _demo_results_path().exists()
+    return {
+        "demo_available": demo_available,
+        "demo_showing": demo_available and not dismissed and not has_real,
+        "dismissed": dismissed,
+        "has_real_results": has_real,
+    }
+
+
+@app.post("/api/demo/remove")
+async def demo_remove():
+    """Hide the bundled demo data (one-click clean slate for new users).
+
+    Writes a marker file so the example results/history stop showing. This is
+    non-destructive — it never deletes the user's own data, and demo data can
+    be restored with /api/demo/restore.
+    """
+    Path("reports").mkdir(parents=True, exist_ok=True)
+    _demo_dismissed_flag().write_text("dismissed", encoding="utf-8")
+    return {"message": "Demo data hidden. The Results page now starts clean."}
+
+
+@app.post("/api/demo/restore")
+async def demo_restore():
+    """Re-show the bundled demo data (undo 'Remove Demo Data')."""
+    flag = _demo_dismissed_flag()
+    if flag.exists():
+        flag.unlink()
+    return {"message": "Demo data restored."}
 
 
 @app.delete("/api/results")
@@ -1044,6 +1151,16 @@ async def clear_results():
     if results_path.exists():
         results_path.unlink()
     return {"message": "Results cleared."}
+
+
+@app.post("/api/run/cancel")
+async def cancel_run():
+    """Cancel the currently running test execution."""
+    global _cancel_requested, _is_running
+    if not _is_running:
+        return {"message": "No run in progress."}
+    _cancel_requested = True
+    return {"message": "Cancellation requested. Run will stop after the current test completes."}
 
 
 @app.post("/api/run")
@@ -1097,7 +1214,8 @@ async def run_single_test(test_name: str, request: Request, background_tasks: Ba
 
 
 async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: Optional[str] = None, tag_filter: Optional[str] = None, agent_override: Optional[str] = None):
-    global _latest_summary, _is_running, _run_progress
+    global _latest_summary, _is_running, _run_progress, _cancel_requested
+    _cancel_requested = False
     try:
         from datetime import datetime
         # Always reload config fresh (user might have changed it via UI)
@@ -1147,6 +1265,9 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
         all_results = []
         try:
             for i, tc in enumerate(test_cases):
+                if _cancel_requested:
+                    _run_progress["current"] = "Cancelled"
+                    break
                 _run_progress["current"] = tc.name
                 _run_progress["completed"] = i
 
@@ -1235,12 +1356,14 @@ async def list_runs():
     if not history_dir.exists():
         return {"runs": []}
 
+    labels = _load_run_labels()
     runs = []
     for f in sorted(history_dir.glob("run_*.json"), reverse=True):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             runs.append({
                 "id": f.stem,
+                "name": labels.get(f.stem, ""),
                 "file": str(f),
                 "timestamp": data.get("timestamp", ""),
                 "total": data.get("total", 0),
@@ -1252,6 +1375,44 @@ async def list_runs():
             pass
 
     return {"runs": runs}
+
+
+def _labels_path() -> Path:
+    return Path("reports/history") / "labels.json"
+
+
+def _load_run_labels() -> Dict[str, str]:
+    """Load the run_id -> friendly-name map (empty if none saved)."""
+    path = _labels_path()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_run_labels(labels: Dict[str, str]) -> None:
+    path = _labels_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(labels, indent=2), encoding="utf-8")
+
+
+@app.put("/api/runs/{run_id}/name")
+async def set_run_name(run_id: str, data: dict):
+    """Set (or clear) a friendly name for a run, for easy comparison later."""
+    history_dir = Path("reports/history")
+    if not (history_dir / f"{run_id}.json").exists():
+        return JSONResponse({"error": f"Run '{run_id}' not found"}, status_code=404)
+
+    name = (data.get("name") or "").strip()
+    labels = _load_run_labels()
+    if name:
+        labels[run_id] = name
+    else:
+        labels.pop(run_id, None)  # empty name clears the label
+    _save_run_labels(labels)
+    return {"message": "Run name updated", "id": run_id, "name": name}
 
 
 @app.get("/api/runs/{run_id}")
@@ -1279,6 +1440,10 @@ async def delete_run(run_id: str):
     html_path = history_dir / f"report_{timestamp}.html"
     if html_path.exists():
         html_path.unlink()
+    # Drop any saved name for this run
+    labels = _load_run_labels()
+    if labels.pop(run_id, None) is not None:
+        _save_run_labels(labels)
     return {"message": f"Run '{run_id}' deleted"}
 
 
@@ -1566,6 +1731,8 @@ async def get_current_agents():
                 "agent_version": agent.agent_version or "",
                 "request_path": agent.request.path if agent.request else "/chat",
                 "response_path": agent.response.content_path if agent.response else "$.response",
+                "handled_by_path": (agent.response.handled_by_path if agent.response else None) or "",
+                "routing_path_path": (agent.response.routing_path_path if agent.response else None) or "",
             })
 
         api_key = os.environ.get("AZURE_API_KEY", "")
@@ -1604,18 +1771,27 @@ async def delete_agent(agent_name: str):
 
 @app.get("/api/settings/keys")
 async def get_api_keys():
-    """Get saved API keys for pre-filling the Settings form.
-    
-    Returns the actual keys so they can be shown as password dots
-    with a show/hide toggle.
+    """Get API key status for the Settings form.
+
+    Returns only a MASKED preview of each key (never the raw secret) so the
+    actual credential is not exposed to the browser. The form leaves the
+    input blank when a key exists; saving with a blank input keeps the
+    existing key, and typing a new value overwrites it.
     """
+    def mask(val: str) -> str:
+        if not val:
+            return ""
+        if len(val) > 12:
+            return val[:6] + "\u2022" * 6 + val[-4:]
+        return "\u2022" * len(val)
+
     azure_key = os.environ.get("AZURE_API_KEY", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     azure_base = os.environ.get("AZURE_API_BASE", "")
 
     return {
-        "azure_api_key": azure_key,
-        "openai_api_key": openai_key,
+        "azure_api_key_masked": mask(azure_key),
+        "openai_api_key_masked": mask(openai_key),
         "azure_api_base": azure_base,
         "has_azure_key": bool(azure_key),
         "has_openai_key": bool(openai_key),
@@ -1675,3 +1851,358 @@ async def dashboard():
     if frontend_path.exists():
         return frontend_path.read_text(encoding="utf-8")
     return "<h1>ATTEST Dashboard</h1><p>Frontend file not found.</p>"
+
+
+# ---------------------------------------------------------------------------
+# Baseline endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/baseline/save")
+async def baseline_save(background_tasks: BackgroundTasks):
+    """Run all tests and save responses as golden baselines."""
+    global _is_running
+    if _is_running:
+        return JSONResponse({"error": "Tests are already running."}, status_code=409)
+    _is_running = True
+    background_tasks.add_task(_execute_baseline_save)
+    return {"message": "Saving baselines..."}
+
+
+async def _execute_baseline_save():
+    global _is_running, _cancel_requested
+    _cancel_requested = False
+    try:
+        from attest.utils.baseline import save_baseline
+
+        config = load_config(_config_path)
+        test_cases = load_scenarios(directory=config.tests.scenarios_dir)
+        if not test_cases:
+            return
+
+        runner = TestRunner(config)
+        summary = await runner.run(
+            test_cases, verbose=False, parallel=1,
+            should_cancel=lambda: _cancel_requested,
+        )
+        count = save_baseline(summary.results)
+        # Store result for polling
+        _run_progress["baseline_saved"] = count
+    except Exception as e:
+        print(f"Baseline save error: {e}")
+    finally:
+        _is_running = False
+
+
+@app.get("/api/baseline/list")
+async def baseline_list():
+    """List all saved baselines."""
+    baseline_dir = Path("baselines")
+    if not baseline_dir.exists():
+        return {"baselines": [], "total": 0}
+
+    baselines = []
+    for f in sorted(baseline_dir.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            baselines.append({
+                "file": f.name,
+                "scenario": data.get("scenario", f.stem),
+                "agent": data.get("agent", "default"),
+                "has_tool_calls": len(data.get("tool_calls", [])) > 0,
+                "content_preview": data.get("content", "")[:100],
+            })
+        except Exception:
+            pass
+
+    return {"baselines": baselines, "total": len(baselines)}
+
+
+@app.post("/api/baseline/diff")
+async def baseline_diff(background_tasks: BackgroundTasks):
+    """Run tests and compare with saved baselines."""
+    global _is_running
+    if _is_running:
+        return JSONResponse({"error": "Tests are already running."}, status_code=409)
+    _is_running = True
+    background_tasks.add_task(_execute_baseline_diff)
+    return {"message": "Running baseline comparison..."}
+
+
+async def _execute_baseline_diff():
+    global _is_running, _run_progress, _cancel_requested
+    _cancel_requested = False
+    try:
+        from attest.utils.baseline import compare_with_baseline
+
+        config = load_config(_config_path)
+        test_cases = load_scenarios(directory=config.tests.scenarios_dir)
+        if not test_cases:
+            return
+
+        runner = TestRunner(config)
+        summary = await runner.run(
+            test_cases, verbose=False, parallel=1,
+            should_cancel=lambda: _cancel_requested,
+        )
+
+        diffs = []
+        for result in summary.results:
+            diff = compare_with_baseline(result)
+            if diff is None:
+                diffs.append({"scenario": result.scenario, "agent": result.agent, "status": "no_baseline"})
+            elif diff["all_match"]:
+                diffs.append({"scenario": result.scenario, "agent": result.agent, "status": "match"})
+            else:
+                diffs.append({
+                    "scenario": result.scenario,
+                    "agent": result.agent,
+                    "status": "changed",
+                    "details": diff["details"],
+                    "content_match": diff["content_match"],
+                    "tool_calls_match": diff["tool_calls_match"],
+                    "routing_match": diff["routing_match"],
+                })
+
+        _run_progress["baseline_diffs"] = diffs
+    except Exception as e:
+        print(f"Baseline diff error: {e}")
+    finally:
+        _is_running = False
+
+
+@app.delete("/api/baseline")
+async def baseline_clear():
+    """Delete all saved baselines."""
+    import shutil
+    baseline_dir = Path("baselines")
+    if baseline_dir.exists():
+        shutil.rmtree(baseline_dir)
+    return {"message": "All baselines deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Execution config endpoints (parallel, profile, rate limit)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/execution-config")
+async def get_execution_config():
+    """Get current execution config (cost, cache, rate limit, profiles)."""
+    try:
+        config = load_config(_config_path)
+
+        # Read profiles from raw YAML
+        profiles = []
+        config_path = _get_config_path()
+        if config_path.exists():
+            from ruamel.yaml import YAML
+            yaml = YAML()
+            with open(config_path, "r", encoding="utf-8") as f:
+                raw = yaml.load(f) or {}
+            profiles = list(raw.get("profiles", {}).keys())
+
+        return {
+            "cache_responses": config.evaluation.cost.cache_responses,
+            "rate_limit": config.evaluation.cost.rate_limit,
+            "max_eval_cost_per_run": config.evaluation.cost.max_eval_cost_per_run,
+            "foundry_upload": config.reporting.foundry_upload,
+            "profiles": profiles,
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/run/advanced")
+async def run_tests_advanced(request: Request, background_tasks: BackgroundTasks):
+    """Run tests with advanced options (parallel, profile)."""
+    global _is_running
+    if _is_running:
+        return JSONResponse({"error": "Tests are already running."}, status_code=409)
+    _is_running = True
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    agent_override = body.get("agent")
+    suite_filter = body.get("suite")
+    tag_filter = body.get("tag")
+    parallel = min(max(int(body.get("parallel", 1)), 1), 20)
+    profile = body.get("profile")
+
+    background_tasks.add_task(
+        _execute_tests_advanced,
+        suite_filter=suite_filter,
+        tag_filter=tag_filter,
+        agent_override=agent_override,
+        parallel=parallel,
+        profile=profile,
+    )
+    msg_parts = ["Test run started"]
+    if parallel > 1:
+        msg_parts.append(f"parallel={parallel}")
+    if profile:
+        msg_parts.append(f"profile={profile}")
+    if agent_override:
+        msg_parts.append(f"agent={agent_override}")
+    return {"message": ". ".join(msg_parts)}
+
+
+async def _execute_tests_advanced(
+    suite_filter=None, tag_filter=None, agent_override=None,
+    parallel=1, profile=None,
+):
+    """Execute tests with parallel and profile support."""
+    global _latest_summary, _is_running, _run_progress, _cancel_requested
+    _cancel_requested = False
+    try:
+        from datetime import datetime
+        from dotenv import load_dotenv
+        load_dotenv(".env", override=True)
+
+        config = load_config(_config_path, profile=profile)
+        test_cases = load_scenarios(directory=config.tests.scenarios_dir)
+
+        if suite_filter:
+            suite_lower = suite_filter.lower().replace("_", " ")
+            test_cases = [
+                tc for tc in test_cases
+                if tc.suite == suite_filter
+                or tc.suite.lower() == suite_lower
+                or tc.suite.lower().replace(" ", "_") == suite_filter.lower()
+            ]
+
+        if tag_filter:
+            test_cases = [tc for tc in test_cases if tag_filter in tc.tags]
+
+        if agent_override:
+            for tc in test_cases:
+                tc.agent = agent_override
+
+        if not test_cases:
+            _is_running = False
+            return
+
+        _run_progress["total"] = len(test_cases)
+        _run_progress["completed"] = 0
+        _run_progress["current"] = ""
+        _run_progress["results"] = []
+
+        runner = TestRunner(config)
+
+        def _on_result(tc, r):
+            status_icon = "✅" if r.status.value == "passed" else "❌" if r.status.value == "failed" else "⚠️"
+            _run_progress["results"].append({
+                "name": r.scenario,
+                "status": r.status.value,
+                "icon": status_icon,
+                "latency_ms": round(r.latency_ms),
+            })
+            _run_progress["completed"] = len(_run_progress["results"])
+
+        summary = await runner.run(
+            test_cases,
+            verbose=False,
+            parallel=parallel,
+            should_cancel=lambda: _cancel_requested,
+            on_result=_on_result,
+        )
+
+        if _cancel_requested:
+            _run_progress["current"] = "Cancelled"
+
+        output_dir = Path(config.reporting.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        json_path = output_dir / "results.json"
+
+        # A cancelled run is partial — never let it clobber the accumulated
+        # results.json. Merge the tests that did complete into the existing
+        # file (keyed by scenario|agent), preserving everything else.
+        if _cancel_requested and json_path.exists():
+            try:
+                existing = json.loads(json_path.read_text(encoding="utf-8"))
+
+                def _result_key(r):
+                    return r["scenario"] + "|" + r.get("agent", "default")
+
+                merged = {_result_key(r): r for r in existing.get("results", [])}
+                for r in json.loads(summary.model_dump_json()).get("results", []):
+                    merged[_result_key(r)] = r
+
+                results_list = list(merged.values())
+                existing["results"] = results_list
+                existing["total"] = len(results_list)
+                existing["passed"] = sum(1 for r in results_list if r.get("status") == "passed")
+                existing["failed"] = sum(1 for r in results_list if r.get("status") == "failed")
+                existing["errors"] = sum(1 for r in results_list if r.get("status") == "error")
+                existing["skipped"] = sum(1 for r in results_list if r.get("status") == "skipped")
+                json_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            except Exception:
+                # If merge fails, fall back to leaving results.json untouched.
+                pass
+            # Don't write history/report snapshots for a partial cancelled run.
+            return
+
+        json_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
+        _latest_summary = summary
+
+        # Save timestamped copy
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        history_dir = output_dir / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        history_path = history_dir / f"run_{timestamp}.json"
+        history_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
+
+        from attest.reporting.html_report import generate_html_report
+        generate_html_report(summary, output_path=str(output_dir / "report.html"))
+        generate_html_report(summary, output_path=str(history_dir / f"report_{timestamp}.html"))
+
+        from attest.reporting.junit_xml import generate_junit_xml
+        generate_junit_xml(summary, output_path=str(output_dir / "junit.xml"))
+
+    except Exception as e:
+        print(f"Dashboard advanced run error: {e}")
+    finally:
+        _is_running = False
+
+
+@app.post("/api/settings/execution")
+async def save_execution_settings(data: dict):
+    """Update execution settings (cache, rate limit, cost, foundry upload) in attest.yaml."""
+    from ruamel.yaml import YAML
+
+    config_path = _get_config_path()
+    yaml = YAML()
+    yaml.preserve_quotes = True
+
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = yaml.load(f) or {}
+    else:
+        raw = {}
+
+    # Ensure nested structure
+    if "evaluation" not in raw:
+        raw["evaluation"] = {}
+    if "cost" not in raw["evaluation"]:
+        raw["evaluation"]["cost"] = {}
+    if "reporting" not in raw:
+        raw["reporting"] = {}
+
+    if "cache_responses" in data:
+        raw["evaluation"]["cost"]["cache_responses"] = bool(data["cache_responses"])
+    if "rate_limit" in data:
+        raw["evaluation"]["cost"]["rate_limit"] = float(data["rate_limit"])
+    if "max_eval_cost_per_run" in data:
+        raw["evaluation"]["cost"]["max_eval_cost_per_run"] = float(data["max_eval_cost_per_run"])
+    if "foundry_upload" in data:
+        raw["reporting"]["foundry_upload"] = bool(data["foundry_upload"])
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(raw, f)
+
+    return {"message": "Execution settings saved"}

@@ -8,7 +8,8 @@
   <a href="docs/GETTING_STARTED.md">Full Setup Guide</a> &nbsp;|&nbsp;
   <a href="docs/TEST_CREATION_GUIDE.md">Test Types</a> &nbsp;|&nbsp;
   <a href="docs/EVALUATION.md">Evaluators</a> &nbsp;|&nbsp;
-  <a href="docs/DASHBOARD.md">Dashboard & API</a>
+  <a href="docs/DASHBOARD.md">Dashboard & API</a> &nbsp;|&nbsp;
+  <a href="examples/">Examples</a>
 </p>
 
 ---
@@ -40,17 +41,62 @@
 Testing AI agents is hard. Responses are non-deterministic, tool calls are invisible, and safety risks are subtle. Existing tools solve pieces of the puzzle — ATTEST puts them together:
 
 - **Write tests in YAML** — no code needed for common scenarios
-- **23 deterministic assertions** — check content, tool calls, JSON structure, latency
-- **32 LLM evaluators** — score relevancy, correctness, bias, toxicity, groundedness across 3 backends
+- **32 deterministic assertions** — content, tool calls, JSON structure, routing, latency, cost, PII, language, semantic similarity, golden baselines
+- **36 LLM evaluators** — score relevancy, correctness, bias, toxicity, groundedness across 4 backends (built-in, DeepEval, Azure AI Evaluation, RAGAS)
 - **Multi-turn conversations** — test booking flows, multi-step tasks, context retention
 - **User simulation** — LLM plays realistic personas to find edge cases humans miss
 - **Security red teaming** — 30 attacks across 7 categories (prompt injection, jailbreak, PII extraction)
+- **Works with the frameworks you use** — LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP, Azure Foundry, HTTP/REST, or any Python callable
+- **Regression & trust over time** — golden baselines, run-vs-run comparison, CI regression gate
 - **Web dashboard** — visual UI to create, run, and analyze tests without touching the CLI
-- **CI/CD ready** — JUnit XML export, CLI runner, exit codes
+- **CI/CD ready** — JUnit XML, Markdown/PR reports, GitHub Actions & Azure DevOps templates, exit codes
+
+---
+
+## How ATTEST compares
+
+Most tools solve one slice of agent testing. ATTEST unifies deterministic checks, LLM-judged
+evaluation, RAG metrics, regression baselines, safety red-teaming, and a dashboard in one
+CI-ready package.
+
+| Capability | ATTEST | LangSmith | DeepEval | Promptfoo | Ragas |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Deterministic assertions (tools, JSON, routing, latency) | ✅ 32 | ⚠️ basic | ⚠️ limited | ✅ | ❌ |
+| LLM-as-judge evaluators | ✅ 36 | ✅ | ✅ | ✅ | ✅ |
+| Multiple eval backends in one tool | ✅ 4 | ❌ | ❌ | ⚠️ | ❌ |
+| RAG evaluation (faithfulness, context recall) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ |
+| Multi-turn conversation testing | ✅ | ✅ | ⚠️ | ⚠️ | ❌ |
+| User simulation (persona-driven) | ✅ | ⚠️ | ❌ | ❌ | ❌ |
+| Security red-teaming (built-in attacks) | ✅ 30 | ❌ | ⚠️ | ⚠️ | ❌ |
+| Golden baselines + regression gate | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
+| Tool-call & multi-agent routing assertions | ✅ | ⚠️ | ⚠️ | ❌ | ❌ |
+| Framework adapters (LangChain/LangGraph/CrewAI/AutoGen/OpenAI Assistants/MCP/Foundry/HTTP) | ✅ 8 | ⚠️ LC only | ⚠️ | ✅ | ❌ |
+| Web dashboard (no-code) | ✅ | ✅ | ❌ | ⚠️ | ❌ |
+| CI templates + PR/Markdown reports | ✅ | ⚠️ | ⚠️ | ✅ | ❌ |
+| Self-hostable / no vendor lock-in | ✅ | ❌ | ✅ | ✅ | ✅ |
+
+> ✅ first-class · ⚠️ partial / via add-ons · ❌ not available.
+> Comparison reflects common usage at time of writing; capabilities of other tools evolve.
 
 ---
 
 ## Quick Start
+
+### Try it instantly (no agent, no API key)
+
+Want to see ATTEST in action first? It ships with example tests for **every test type**
+that run offline against a built-in `mock` agent:
+
+```bash
+pip install -e "."
+attest examples           # list the bundled example suites
+attest examples --run     # run the offline ones against the mock agent
+attest serve              # explore sample results for every type in the dashboard
+```
+
+The dashboard's Results page is pre-populated with **sample results** so nothing is empty on
+first launch. Hide them anytime in **Settings → Demo & Example Data**. When you're ready to
+test your own agent, follow the steps below.
 
 ### 1. Install
 
@@ -59,10 +105,13 @@ git clone https://github.com/ManikantaBathinedi/ATTEST.git
 cd ATTEST
 pip install -e "."
 
-# Optional evaluation backends
+# Optional evaluation backends & adapters
 pip install -e ".[deepeval]"    # DeepEval (bias, toxicity, RAG metrics)
-pip install -e ".[azure]"      # Azure AI Evaluation SDK
-pip install -e ".[all]"        # Everything
+pip install -e ".[azure]"       # Azure AI Evaluation SDK
+pip install -e ".[ragas]"       # RAGAS RAG metrics
+pip install -e ".[langchain]"   # LangChain adapter
+pip install -e ".[langgraph]"   # LangGraph adapter
+pip install -e ".[all]"         # Everything
 ```
 
 ### 2. Initialize
@@ -138,7 +187,7 @@ tests:
     evaluators: [relevancy, tone]
 ```
 
-> See the [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) for all 8 test types with examples.
+> See the [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) for all 9 test types with examples.
 
 ### 6. Run
 
@@ -160,13 +209,14 @@ Or check `reports/results.json` directly.
 
 ## Evaluators
 
-ATTEST ships with **32 evaluators** across 3 backends. Mix and match in YAML:
+ATTEST ships with **36 evaluators** across 4 backends. Mix and match in YAML:
 
 | Backend | Count | Metrics |
 |---------|-------|---------|
 | **Built-in** | 5 | correctness, relevancy, hallucination, completeness, tone |
 | **DeepEval** | 12 | bias, toxicity, faithfulness, contextual relevancy/recall/precision, tool correctness, summarization, and more |
 | **Azure AI SDK** | 15 | groundedness, coherence, fluency, violence, self-harm, hate/unfairness, f1 score, BLEU, and more |
+| **RAGAS** | 4 | faithfulness, answer relevancy, context precision, context recall |
 
 ```yaml
 evaluators:
@@ -182,13 +232,25 @@ evaluators:
 
 ## Web Dashboard
 
+Prefer a visual, no-code experience? Launch the dashboard:
+
 ```bash
-attest serve
+attest serve                 # starts the web UI and opens your browser
+# → ATTEST Dashboard starting on http://localhost:8080
 ```
 
-7 pages: **Dashboard** (summary + run all), **Agent Setup** (connections), **Test Cases** (create/upload), **Test Suites** (organize by tags), **Run Tests** (execute), **Results** (filter + compare), **Settings** (config + evaluator status).
+Then open **http://localhost:8080** in your browser (use `--port 3000` to change the port).
+If the auto-opened tab shows a connection error on Windows, open **http://127.0.0.1:8080** instead.
 
-Features: bulk CSV/JSONL upload, AI test generation, run history comparison, trend charts, HTML report export.
+**9 pages**, grouped for a natural workflow:
+
+- **Dashboard** — welcome overview: workspace counts (agents, tests, suites, runs) + latest-run stats
+- *Setup:* **Agent Setup** (connect Foundry / HTTP / MCP agents), **Test Cases** (create or upload), **Test Suites** (organize by file & tags)
+- *Run & Evaluate:* **Run Tests** (run all / suite / tag / single), **Results** (scores, latency, failures, compare runs)
+- *Advanced:* **Baselines** (golden snapshots + regression diff)
+- *Pinned:* **Settings** (API keys, cost controls, evaluator status), **Help & About** (getting-started guide + framework info)
+
+Features: bulk CSV/JSONL upload, AI test generation, run history & run-vs-run comparison, named runs, trend charts, HTML/Markdown report export.
 
 > API reference: [Dashboard docs](docs/DASHBOARD.md)
 
@@ -221,15 +283,16 @@ asyncio.run(main())
 
 ```
 attest/
-├── adapters/           # Agent connectors (Foundry, HTTP, Callable)
-├── cli/                # CLI commands (init, run, serve, test-connection)
+├── adapters/           # Agent connectors (Mock, Foundry, HTTP, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP)
+├── cli/                # CLI commands (init, run, serve, examples, ci, test-connection)
 ├── core/               # Config, models, runner, assertions, scenario loader
 ├── conversation/       # Multi-turn conversation engine
 ├── dashboard/          # Web UI — FastAPI backend + single HTML frontend
 ├── evaluation/         # Evaluator framework + 5 built-in evaluators
 ├── plugins/
 │   ├── deepeval_plugin/  # 12 DeepEval evaluators
-│   └── azure_eval/       # 15 Azure AI SDK evaluators
+│   ├── azure_eval/       # 15 Azure AI SDK evaluators
+│   └── ragas_plugin/     # 4 RAGAS RAG evaluators
 ├── reporting/          # HTML, JUnit XML, CSV report generators
 ├── security/           # Red team attack generator (30 patterns)
 └── simulation/         # User simulation (LLM-driven personas)
@@ -242,8 +305,8 @@ attest/
 | Guide | What it covers |
 |-------|---------------|
 | [Getting Started](docs/GETTING_STARTED.md) | Full setup walkthrough — install, auth, first test run |
-| [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) | All 8 test types with YAML, CSV, JSONL, and Python examples |
-| [Evaluation](docs/EVALUATION.md) | 32 evaluators, 3 backends, auth options, custom evaluators |
+| [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) | All 9 test types with YAML, CSV, JSONL, and Python examples |
+| [Evaluation](docs/EVALUATION.md) | 36 evaluators, 4 backends, auth options, custom evaluators |
 | [Dashboard & API](docs/DASHBOARD.md) | Dashboard pages, REST API reference |
 
 ---

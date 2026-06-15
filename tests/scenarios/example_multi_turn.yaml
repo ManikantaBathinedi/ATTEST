@@ -1,0 +1,24 @@
+# ============================================================
+# EXAMPLE — Multi-Turn Conversation Tests
+# ============================================================
+# Drive a scripted back-and-forth and check each turn.
+# Runs offline against the mock_agent.
+# ============================================================
+
+name: "Example · Multi-Turn Conversation"
+agent: mock_agent
+
+tests:
+  - name: booking_conversation
+    type: conversation
+    tags: [example, regression]
+    script:
+      - user: "I want to plan a trip to Japan."
+        expect:
+          response_contains_any: ["Tokyo", "Kyoto", "Japan"]
+      - user: "What about a refund if I cancel?"
+        expect:
+          response_not_empty: true
+      - user: "Great, thanks!"
+        expect:
+          response_not_empty: true

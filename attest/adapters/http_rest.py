@@ -152,12 +152,15 @@ class HttpAgentAdapter(BaseAgentAdapter):
         content = self._extract_content(response_data)
         tool_calls = self._extract_tool_calls(response_data)
         token_usage = self._extract_token_usage(response_data)
+        handled_by, routing_path = self._extract_routing(response_data)
 
         return AgentResponse(
             content=content,
             tool_calls=tool_calls,
             latency_ms=latency_ms,
             token_usage=token_usage,
+            handled_by=handled_by,
+            routing_path=routing_path,
             raw_response=response_data,
         )
 
@@ -181,6 +184,94 @@ class HttpAgentAdapter(BaseAgentAdapter):
             return True
         except Exception:
             return False
+
+    # ------------------------------------------------------------------
+    # Streaming (SSE / chunked)
+    # ------------------------------------------------------------------
+
+    async def send_message_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Message]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """Stream a response from an HTTP agent via Server-Sent Events / chunks.
+
+        Reads the response line-by-line. For SSE, lines beginning with
+        ``data:`` are parsed: a JSON payload has its text extracted via the
+        configured ``response_path`` (falling back to common keys / raw text),
+        and ``[DONE]`` ends the stream. For plain chunked text, each line is
+        emitted as a delta.
+
+        If the endpoint does not actually stream, this still works — it just
+        yields the whole body as chunks.
+        """
+        from attest.adapters.base import StreamChunk
+
+        if self._client is None:
+            await self.setup()
+
+        body = self._build_request_body(message, conversation_history, metadata)
+        headers = self._build_headers()
+        headers.setdefault("Accept", "text/event-stream")
+        url = self._build_url()
+
+        try:
+            async with self._client.stream(
+                method=self._config.request.method,
+                url=url,
+                json=body,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                async for raw_line in response.aiter_lines():
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    payload = line[5:].strip() if line.startswith("data:") else line
+                    if payload == "[DONE]":
+                        break
+                    delta = self._extract_stream_delta(payload)
+                    if delta:
+                        yield StreamChunk(delta=delta)
+        except httpx.HTTPStatusError as e:
+            raise AdapterError(
+                f"Agent at {url} returned HTTP {e.response.status_code} during streaming"
+            ) from e
+        except httpx.TimeoutException as e:
+            raise AdapterError(f"Agent at {url} timed out during streaming") from e
+        except Exception as e:  # noqa: BLE001
+            raise AdapterError(f"HTTP streaming from {url} failed: {e}") from e
+        yield StreamChunk(done=True)
+
+    def _extract_stream_delta(self, payload: str) -> str:
+        """Pull the incremental text out of one streamed line/event."""
+        import json as _json
+
+        try:
+            data = _json.loads(payload)
+        except Exception:
+            # Not JSON — treat the whole line as text
+            return payload
+
+        # Try the configured response path first, then common streaming keys.
+        if self._config.response.content_path:
+            val = extract_by_path(data, self._config.response.content_path)
+            if isinstance(val, str):
+                return val
+        # OpenAI-style delta
+        try:
+            choices = data.get("choices") if isinstance(data, dict) else None
+            if choices:
+                delta = choices[0].get("delta") or choices[0].get("message") or {}
+                if isinstance(delta, dict) and isinstance(delta.get("content"), str):
+                    return delta["content"]
+        except Exception:
+            pass
+        for key in ("delta", "text", "content", "response", "token"):
+            if isinstance(data, dict) and isinstance(data.get(key), str):
+                return data[key]
+        return ""
 
     # ------------------------------------------------------------------
     # Private helpers (each does ONE simple thing)
@@ -300,6 +391,37 @@ class HttpAgentAdapter(BaseAgentAdapter):
                     )
                 )
         return tool_calls
+
+    def _extract_routing(self, response_data: Any):
+        """Extract multi-agent routing info (handled_by + routing_path).
+
+        Returns a ``(handled_by, routing_path)`` tuple. Both default to
+        ``None`` / ``[]`` when the orchestrator doesn't report routing or the
+        paths aren't configured.
+        """
+        handled_by = None
+        routing_path: List[str] = []
+
+        hb_path = self._config.response.handled_by_path
+        if hb_path:
+            val = extract_by_path(response_data, hb_path)
+            if val is not None:
+                handled_by = str(val)
+
+        rp_path = self._config.response.routing_path_path
+        if rp_path:
+            val = extract_by_path(response_data, rp_path)
+            if isinstance(val, list):
+                routing_path = [str(x) for x in val]
+            elif isinstance(val, str):
+                # Accept a delimited string too (e.g. "orchestrator>flights").
+                routing_path = [p.strip() for p in val.replace("→", ">").split(">") if p.strip()]
+
+        # If only the routing path is known, infer handled_by as its last hop.
+        if handled_by is None and routing_path:
+            handled_by = routing_path[-1]
+
+        return handled_by, routing_path
 
     def _extract_token_usage(self, response_data: Any) -> Optional[TokenUsage]:
         """Extract token usage from the response, if configured."""

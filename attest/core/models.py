@@ -92,8 +92,13 @@ class AgentResponse(BaseModel):
     tool_calls: List[ToolCall] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     latency_ms: float = 0.0
+    time_to_first_token_ms: Optional[float] = None  # Streaming: latency to first token
     token_usage: Optional[TokenUsage] = None
     raw_response: Optional[Any] = None  # Original response object (excluded from serialization)
+
+    # Multi-agent orchestrator fields
+    handled_by: Optional[str] = None  # Sub-agent that handled the request
+    routing_path: List[str] = Field(default_factory=list)  # Full routing chain (e.g. ["orchestrator", "flights_agent"])
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -226,6 +231,10 @@ class TestResult(BaseModel):
     error: Optional[str] = None
     agent: str = "default"
     tags: List[str] = Field(default_factory=list)
+
+    # Multi-agent orchestrator tracking
+    handled_by: Optional[str] = None  # Sub-agent that handled the request
+    routing_path: List[str] = Field(default_factory=list)  # Full routing chain
 
     @property
     def passed(self) -> bool:

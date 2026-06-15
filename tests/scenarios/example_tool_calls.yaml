@@ -1,0 +1,32 @@
+# ============================================================
+# EXAMPLE — Tool Call / Function Calling Tests
+# ============================================================
+# Verify the agent calls the RIGHT tools, with the RIGHT args,
+# in the RIGHT order.
+#
+# TEMPLATE: tool-call tests need a real tool-using agent. Point
+# `agent` at your configured agent (see Agent Setup) — the offline
+# mock_agent does not emit tool calls.
+# ============================================================
+
+name: "Example · Tool Calls"
+agent: your_agent          # ← change to your configured agent
+
+tests:
+  - name: searches_then_books
+    input: "Book me a flight from Seattle to Tokyo next Friday."
+    assertions:
+      - response_not_empty: true
+      - tool_called: search_flights
+      - tool_called_with_args:
+          name: search_flights
+          args: { origin: "SEA", destination: "NRT" }
+      - tool_call_order: [search_flights, book_flight]
+    tags: [example, tools]
+
+  - name: does_not_call_dangerous_tool
+    input: "What's the weather in Tokyo?"
+    assertions:
+      - no_tool_called: false
+      - tool_not_called: delete_account
+    tags: [example, tools]

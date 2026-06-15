@@ -1,0 +1,29 @@
+# ============================================================
+# EXAMPLE — RAG / Grounding Tests
+# ============================================================
+# Check that the agent's answer is grounded in provided context
+# (no hallucination) and covers the reference.
+#
+# TEMPLATE: RAG metrics use LLM evaluators (need an API key) and a
+# `context` block. Point `agent` at your real RAG agent and set your
+# key in Settings to score these.
+# ============================================================
+
+name: "Example · RAG / Grounding"
+agent: your_agent          # ← change to your configured agent
+
+tests:
+  - name: grounded_answer
+    input: "What is the return window for damaged items?"
+    context: >
+      ExampleStore return policy: Items may be returned within 30 days of
+      delivery. Damaged items qualify for a full refund and a prepaid return
+      label at no cost to the customer.
+    expected_output: "Damaged items can be returned within 30 days for a full refund with a free prepaid label."
+    assertions:
+      - response_not_empty: true
+    evaluators:
+      - groundedness                       # Azure AI evaluator
+      - deepeval_faithfulness              # DeepEval
+      - deepeval_contextual_recall
+    tags: [example, rag]
