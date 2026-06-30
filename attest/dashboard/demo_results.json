@@ -8,7 +8,47 @@
   "errors": 0,
   "skipped": 0,
   "overall_score": 0.0,
-  "total_cost": 0.0197,
+  "total_cost": 0.000476,
+  "perf": {
+    "total_requests": 12,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "count": 12,
+      "min": 25.0,
+      "max": 4120.0,
+      "mean": 1201.08,
+      "p50": 804.0,
+      "p90": 2591.0,
+      "p95": 3300.5,
+      "p99": 3956.1
+    },
+    "ttft_ms": {
+      "count": 0,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "total_tokens": {
+      "count": 5,
+      "min": 250.0,
+      "max": 700.0,
+      "mean": 438.8,
+      "p50": 380.0,
+      "p90": 625.6,
+      "p95": 662.8,
+      "p99": 692.56
+    },
+    "cost_usd": {
+      "total": 0.000476,
+      "mean": 9.5e-05,
+      "max": 0.000131
+    },
+    "throughput_rps": 0.56
+  },
   "is_demo": true,
   "results": [
     {
@@ -54,7 +94,18 @@
       "tags": [
         "example",
         "smoke"
-      ]
+      ],
+      "benchmark": {
+        "runs": 10,
+        "count": 10,
+        "min": 22.0,
+        "max": 41.0,
+        "mean": 27.4,
+        "p50": 25.0,
+        "p90": 33.0,
+        "p95": 37.0,
+        "p99": 41.0
+      }
     },
     {
       "scenario": "japan_destinations",
@@ -293,7 +344,12 @@
       "tool_calls": [],
       "error": null,
       "latency_ms": 4120,
-      "estimated_cost": 0.0031,
+      "token_usage": {
+        "input_tokens": 418,
+        "output_tokens": 96,
+        "total_tokens": 514
+      },
+      "estimated_cost": 0.00012,
       "tags": [
         "example",
         "simulation"
@@ -397,7 +453,12 @@
       "tool_calls": [],
       "error": null,
       "latency_ms": 1850,
-      "estimated_cost": 0.0021,
+      "token_usage": {
+        "input_tokens": 212,
+        "output_tokens": 38,
+        "total_tokens": 250
+      },
+      "estimated_cost": 5.5e-05,
       "tags": [
         "example",
         "safety"
@@ -526,7 +587,12 @@
       ],
       "error": null,
       "latency_ms": 2240,
-      "estimated_cost": 0.0048,
+      "token_usage": {
+        "input_tokens": 286,
+        "output_tokens": 64,
+        "total_tokens": 350
+      },
+      "estimated_cost": 8.1e-05,
       "tags": [
         "example",
         "tools"
@@ -561,33 +627,173 @@
         }
       ],
       "scores": {
+        "correctness": {
+          "name": "correctness",
+          "score": 0.94,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Matches the reference answer: 30-day window, full refund, free label.",
+          "backend": "builtin",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "relevancy": {
+          "name": "relevancy",
+          "score": 0.96,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Directly answers the question about the return window.",
+          "backend": "builtin",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "completeness": {
+          "name": "completeness",
+          "score": 0.88,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Covers window, refund, and label \u2014 all parts addressed.",
+          "backend": "builtin",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "hallucination": {
+          "name": "hallucination",
+          "score": 0.97,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "No fabricated details beyond the source context.",
+          "backend": "builtin",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "tone": {
+          "name": "tone",
+          "score": 0.91,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Clear, professional, and helpful.",
+          "backend": "builtin",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "deepeval_faithfulness": {
+          "name": "deepeval_faithfulness",
+          "score": 0.9,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "All claims are supported by the retrieved policy text.",
+          "backend": "deepeval",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "deepeval_contextual_relevancy": {
+          "name": "deepeval_contextual_relevancy",
+          "score": 0.86,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Retrieved context is on-topic for the question.",
+          "backend": "deepeval",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "deepeval_contextual_recall": {
+          "name": "deepeval_contextual_recall",
+          "score": 0.85,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Context covers the 30-day window and free label.",
+          "backend": "deepeval",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "deepeval_contextual_precision": {
+          "name": "deepeval_contextual_precision",
+          "score": 0.82,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Most retrieved context is relevant, little noise.",
+          "backend": "deepeval",
+          "raw_score": null,
+          "metadata": {}
+        },
         "groundedness": {
           "name": "groundedness",
           "score": 0.93,
           "passed": true,
           "threshold": 0.7,
-          "reason": "All claims are supported by the provided return-policy context.",
+          "reason": "Every claim is grounded in the provided return-policy context.",
           "backend": "azure",
           "raw_score": null,
           "metadata": {}
         },
-        "faithfulness": {
-          "name": "faithfulness",
-          "score": 0.9,
+        "coherence": {
+          "name": "coherence",
+          "score": 0.95,
           "passed": true,
           "threshold": 0.7,
-          "reason": "No hallucinated facts; answer matches the source.",
-          "backend": "deepeval",
+          "reason": "Logically structured and easy to follow.",
+          "backend": "azure",
           "raw_score": null,
           "metadata": {}
         },
-        "contextual_recall": {
-          "name": "contextual_recall",
-          "score": 0.85,
+        "fluency": {
+          "name": "fluency",
+          "score": 0.97,
           "passed": true,
           "threshold": 0.7,
-          "reason": "Covers the 30-day window and free label from the reference.",
-          "backend": "deepeval",
+          "reason": "Natural, grammatically correct language.",
+          "backend": "azure",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "azure_relevance": {
+          "name": "azure_relevance",
+          "score": 0.92,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Highly relevant to the user's query.",
+          "backend": "azure",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "ragas_faithfulness": {
+          "name": "ragas_faithfulness",
+          "score": 0.91,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Answer is faithful to the retrieved context.",
+          "backend": "ragas",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "ragas_answer_relevancy": {
+          "name": "ragas_answer_relevancy",
+          "score": 0.89,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Answer is pertinent to the question asked.",
+          "backend": "ragas",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "ragas_context_precision": {
+          "name": "ragas_context_precision",
+          "score": 0.84,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Relevant context ranked highly.",
+          "backend": "ragas",
+          "raw_score": null,
+          "metadata": {}
+        },
+        "ragas_context_recall": {
+          "name": "ragas_context_recall",
+          "score": 0.87,
+          "passed": true,
+          "threshold": 0.7,
+          "reason": "Retrieved context recalls the reference facts.",
+          "backend": "ragas",
           "raw_score": null,
           "metadata": {}
         }
@@ -595,7 +801,12 @@
       "tool_calls": [],
       "error": null,
       "latency_ms": 2630,
-      "estimated_cost": 0.0036,
+      "token_usage": {
+        "input_tokens": 642,
+        "output_tokens": 58,
+        "total_tokens": 700
+      },
+      "estimated_cost": 0.000131,
       "tags": [
         "example",
         "rag"
@@ -668,7 +879,12 @@
       ],
       "error": null,
       "latency_ms": 1840,
-      "estimated_cost": 0.0042,
+      "token_usage": {
+        "input_tokens": 308,
+        "output_tokens": 72,
+        "total_tokens": 380
+      },
+      "estimated_cost": 8.9e-05,
       "tags": [
         "example",
         "multi_agent",
@@ -726,7 +942,7 @@
       ],
       "error": null,
       "latency_ms": 1530,
-      "estimated_cost": 0.0019,
+      "estimated_cost": 0.0,
       "tags": [
         "example",
         "multi_agent",

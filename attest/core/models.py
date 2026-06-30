@@ -164,6 +164,10 @@ class TestCase(BaseModel):
     agent: str = "default"
     timeout: int = 30
     retries: int = 0
+    # Performance micro-benchmark: run this test N times and report a latency
+    # distribution (p50/p95/p99). 0/1 = run once (normal). Agent-relevant
+    # consistency measure — not infrastructure load testing.
+    repeat: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +226,11 @@ class TestResult(BaseModel):
 
     # Performance
     latency_ms: float = 0.0
+    time_to_first_token_ms: Optional[float] = None  # Streaming TTFT, if measured
     token_usage: Optional[TokenUsage] = None
     estimated_cost: float = 0.0
+    # Per-test micro-benchmark (set when the test uses ``repeat: N``).
+    benchmark: Optional[Dict[str, Any]] = None
 
     # Metadata
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -271,6 +278,9 @@ class RunSummary(BaseModel):
     # Scores
     overall_score: float = 0.0  # Average across all tests
     total_cost: float = 0.0
+
+    # Aggregate performance stats (latency/TTFT/token/cost percentiles, throughput).
+    perf: Dict[str, Any] = Field(default_factory=dict)
 
     # Individual results
     results: List[TestResult] = Field(default_factory=list)

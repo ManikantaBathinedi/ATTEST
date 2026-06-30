@@ -22,6 +22,11 @@ def score(name, value, passed, reason, backend="builtin"):
             "reason": reason, "backend": backend, "raw_score": None, "metadata": {}}
 
 
+def tokens(inp, out):
+    """Real model-reported token usage (input/output/total)."""
+    return {"input_tokens": inp, "output_tokens": out, "total_tokens": inp + out}
+
+
 def msgs(user, agent):
     return [
         {"role": "user", "content": user, "name": None, "metadata": {}},
@@ -101,6 +106,7 @@ results.append({
         "tone": score("tone", 0.62, False, "Professional but could show more empathy for a frustrated customer.", "builtin"),
     },
     "tool_calls": [], "error": None, "latency_ms": 4120,
+    "token_usage": tokens(418, 96),
     "estimated_cost": 0.0031, "tags": ["example", "simulation"],
 })
 
@@ -126,6 +132,7 @@ results.append({
         "toxicity": score("toxicity", 0.99, True, "Language is respectful and non-toxic.", "deepeval"),
     },
     "tool_calls": [], "error": None, "latency_ms": 1850,
+    "token_usage": tokens(212, 38),
     "estimated_cost": 0.0021, "tags": ["example", "safety"],
 })
 
@@ -155,10 +162,11 @@ results.append({
     "scores": {}, "tool_calls": [
         {"name": "search_flights", "arguments": {"origin": "SEA", "destination": "NRT", "date": "next Friday"}, "result": "3 flights"},
         {"name": "book_flight", "arguments": {"flight_id": "ANA-118"}, "result": "confirmed ZX19A"},
-    ], "error": None, "latency_ms": 2240, "estimated_cost": 0.0048, "tags": ["example", "tools"],
+    ], "error": None, "latency_ms": 2240, "token_usage": tokens(286, 64), "estimated_cost": 0.0048, "tags": ["example", "tools"],
 })
 
 # 8) RAG / Grounding (LLM-evaluated) ----------------------------------------
+# Showcase run: evaluators across ALL FOUR backends (built-in, DeepEval, Azure, RAGAS).
 results.append({
     "scenario": "grounded_answer", "suite": "Example · RAG / Grounding", "status": "passed",
     "agent": "your_agent",
@@ -166,11 +174,30 @@ results.append({
                      "Damaged items can be returned within 30 days of delivery for a full refund, with a free prepaid return label."),
     "assertions": [assertion("response_not_empty")],
     "scores": {
-        "groundedness": score("groundedness", 0.93, True, "All claims are supported by the provided return-policy context.", "azure"),
-        "faithfulness": score("faithfulness", 0.90, True, "No hallucinated facts; answer matches the source.", "deepeval"),
-        "contextual_recall": score("contextual_recall", 0.85, True, "Covers the 30-day window and free label from the reference.", "deepeval"),
+        # Built-in (your configured LLM judge)
+        "correctness": score("correctness", 0.94, True, "Matches the reference answer: 30-day window, full refund, free label.", "builtin"),
+        "relevancy": score("relevancy", 0.96, True, "Directly answers the question about the return window.", "builtin"),
+        "completeness": score("completeness", 0.88, True, "Covers window, refund, and label — all parts addressed.", "builtin"),
+        "hallucination": score("hallucination", 0.97, True, "No fabricated details beyond the source context.", "builtin"),
+        "tone": score("tone", 0.91, True, "Clear, professional, and helpful.", "builtin"),
+        # DeepEval
+        "deepeval_faithfulness": score("deepeval_faithfulness", 0.90, True, "All claims are supported by the retrieved policy text.", "deepeval"),
+        "deepeval_contextual_relevancy": score("deepeval_contextual_relevancy", 0.86, True, "Retrieved context is on-topic for the question.", "deepeval"),
+        "deepeval_contextual_recall": score("deepeval_contextual_recall", 0.85, True, "Context covers the 30-day window and free label.", "deepeval"),
+        "deepeval_contextual_precision": score("deepeval_contextual_precision", 0.82, True, "Most retrieved context is relevant, little noise.", "deepeval"),
+        # Azure AI Evaluation
+        "groundedness": score("groundedness", 0.93, True, "Every claim is grounded in the provided return-policy context.", "azure"),
+        "coherence": score("coherence", 0.95, True, "Logically structured and easy to follow.", "azure"),
+        "fluency": score("fluency", 0.97, True, "Natural, grammatically correct language.", "azure"),
+        "azure_relevance": score("azure_relevance", 0.92, True, "Highly relevant to the user's query.", "azure"),
+        # RAGAS
+        "ragas_faithfulness": score("ragas_faithfulness", 0.91, True, "Answer is faithful to the retrieved context.", "ragas"),
+        "ragas_answer_relevancy": score("ragas_answer_relevancy", 0.89, True, "Answer is pertinent to the question asked.", "ragas"),
+        "ragas_context_precision": score("ragas_context_precision", 0.84, True, "Relevant context ranked highly.", "ragas"),
+        "ragas_context_recall": score("ragas_context_recall", 0.87, True, "Retrieved context recalls the reference facts.", "ragas"),
     },
     "tool_calls": [], "error": None, "latency_ms": 2630,
+    "token_usage": tokens(642, 58),
     "estimated_cost": 0.0036, "tags": ["example", "rag"],
 })
 
@@ -188,7 +215,7 @@ results.append({
         {"name": "search_flights", "arguments": {"origin": "SEA", "destination": "NRT"}, "result": "3 flights"},
     ],
     "handled_by": "flights_agent", "routing_path": ["orchestrator", "flights_agent"],
-    "error": None, "latency_ms": 1840, "estimated_cost": 0.0042, "tags": ["example", "multi_agent", "routing"],
+    "error": None, "latency_ms": 1840, "token_usage": tokens(308, 72), "estimated_cost": 0.0042, "tags": ["example", "multi_agent", "routing"],
 })
 results.append({
     "scenario": "routes_billing_question_to_billing_agent", "suite": "Example · Multi-Agent Routing",
@@ -203,9 +230,38 @@ results.append({
     "error": None, "latency_ms": 1530, "estimated_cost": 0.0019, "tags": ["example", "multi_agent", "routing"],
 })
 
+# Recompute each run's estimated cost from its real token usage, so demo costs
+# are internally consistent (cost = tokens × the demo model's per-1K price).
+# This mirrors what the runner does for real runs via attest.core.pricing.
+from attest.core.models import TokenUsage
+from attest.core.pricing import estimate_cost
+
+DEMO_MODEL = "gpt-4o-mini"  # the model the demo agents are assumed to use
+for r in results:
+    tu = r.get("token_usage")
+    if tu:
+        r["estimated_cost"] = estimate_cost(
+            TokenUsage(**tu), model=DEMO_MODEL
+        )
+    else:
+        r["estimated_cost"] = 0.0
+
 passed = sum(1 for r in results if r["status"] == "passed")
 failed = sum(1 for r in results if r["status"] == "failed")
 errors = sum(1 for r in results if r["status"] == "error")
+
+# Aggregate performance stats from the demo latencies/tokens/costs, so the
+# Performance panel is populated in the demo just like a real run.
+from attest.perf.stats import compute_perf_stats
+
+_perf = compute_perf_stats(results)
+_perf["throughput_rps"] = round(len(results) / 21.4, 2)
+
+# Attach a sample micro-benchmark to the single-turn "greeting" demo result.
+for r in results:
+    if r["scenario"] == "greeting":
+        r["benchmark"] = {"runs": 10, "count": 10, "min": 22.0, "max": 41.0,
+                          "mean": 27.4, "p50": 25.0, "p90": 33.0, "p95": 37.0, "p99": 41.0}
 
 doc = {
     "run_id": "demo_examples",
@@ -217,7 +273,8 @@ doc = {
     "errors": errors,
     "skipped": 0,
     "overall_score": 0.0,
-    "total_cost": round(sum(r.get("estimated_cost", 0) for r in results), 4),
+    "total_cost": round(sum(r.get("estimated_cost", 0) for r in results), 6),
+    "perf": _perf,
     "is_demo": True,
     "results": results,
 }

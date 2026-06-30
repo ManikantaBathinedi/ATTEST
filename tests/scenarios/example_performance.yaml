@@ -1,0 +1,42 @@
+# ============================================================
+# EXAMPLE — Performance Tests
+# ============================================================
+# Treats latency, time-to-first-token, throughput, and cost as
+# first-class QUALITY GATES — not infrastructure load testing
+# (use k6 / Locust for concurrent load).
+#
+# Runs offline against the built-in `mock_agent` (no API key needed).
+# Swap `agent: mock_agent` for your own configured agent to test it.
+# ============================================================
+
+name: "Example · Performance"
+agent: mock_agent
+
+tests:
+  # --- Per-response SLA assertions ---
+  - name: response_within_sla
+    input: "Hello! What can you help me with?"
+    assertions:
+      - response_not_empty: true
+      - latency_under: 2000            # total response under 2s
+      - ttft_under: 800                # streaming: first token under 800ms (skipped if not streaming)
+      - tokens_per_second_over: 10     # output throughput >= 10 tok/s (skipped if no usage)
+    tags: [example, performance]
+
+  - name: response_size_bounded
+    input: "Give me a short travel tip."
+    assertions:
+      - response_not_empty: true
+      - token_usage_under: 500         # response under 500 tokens
+    tags: [example, performance]
+
+  # --- Latency benchmark: run 10× and report p50/p95/p99 distribution ---
+  # Measures the agent's latency CONSISTENCY (LLM latency varies run-to-run).
+  # The distribution shows in the test's detail on the Results page.
+  - name: greeting_latency_benchmark
+    input: "Hello!"
+    repeat: 10
+    assertions:
+      - response_not_empty: true
+      - latency_under: 3000
+    tags: [example, performance, benchmark]

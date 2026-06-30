@@ -237,6 +237,7 @@ def _parse_single_test(
         description=test_data.get("description"),
         persona=test_data.get("persona"),
         max_turns=test_data.get("max_turns"),
+        repeat=test_data.get("repeat", 0),
     )
 
 

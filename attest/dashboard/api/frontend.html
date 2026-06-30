@@ -111,6 +111,8 @@
         .section-card-header .caret { font-size:8px; transition:transform 0.2s; display:inline-block; color:var(--text-mute); }
         .section-card-header.open .caret { transform:rotate(90deg); }
         .section-card-body { padding:9px 15px 13px; border-top:1px solid var(--border-soft); }
+        .bl-card.open .bl-body { display:block !important; }
+        .bl-card.open .bl-chevron { transform:rotate(180deg); display:inline-block; }
         .tag { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; background:#4f8cff20; color:#93b4ff; margin:2px; cursor:default; }
         .tag-remove { cursor:pointer; margin-left:4px; color:var(--text-dim); }
         .tag-remove:hover { color:var(--red); }
@@ -146,6 +148,19 @@
         </div>
     </div>
     <div class="main">
+
+<!-- Global running banner — fixed to the top of the viewport on every page while a run is active -->
+<div id="globalRunBar" style="display:none;position:fixed;top:0;left:232px;right:0;z-index:200;padding:12px 24px;background:linear-gradient(90deg,#1d4ed8,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.4)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span class="spinner" style="border-top-color:#fff"></span>
+        <strong id="globalRunTitle">Running tests…</strong>
+        <span id="globalRunDetail" style="opacity:.9;font-size:13px"></span>
+        <div style="flex:1;min-width:120px;height:6px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden;max-width:320px">
+            <div id="globalRunFill" style="height:100%;width:0%;background:#fff;transition:width .3s"></div>
+        </div>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)" onclick="cancelRun()">■ Stop</button>
+    </div>
+</div>
 
 <!-- ================= HOME ================= -->
 <div class="page active" id="page-home">
@@ -385,6 +400,14 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
                 <div class="checkbox-group" style="margin-top:4px">
                     <label><input type="checkbox" data-assert="latency_under"> <span>Latency Under (ms):</span></label>
                     <input id="t-latency" value="15000" style="width:80px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="Streaming time-to-first-token under N ms (skipped if not streaming)"><input type="checkbox" data-assert="ttft_under"> <span>TTFT Under (ms):</span></label>
+                    <input id="t-ttft" value="800" style="width:80px;display:inline">
+                </div>
+                <div class="checkbox-group" style="margin-top:4px">
+                    <label title="Output throughput at least N tokens/sec (skipped if no token usage)"><input type="checkbox" data-assert="tokens_per_second_over"> <span>Tokens/sec Over:</span></label>
+                    <input id="t-tps" value="20" style="width:80px;display:inline">
                 </div>
             </div>
         </div>
@@ -844,6 +867,30 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             <span id="runPageStatus" style="color:#94a3b8;line-height:40px"></span>
         </div>
     </div>
+
+    <!-- Performance benchmark -->
+    <div class="section">
+        <h2>⚡ Performance Benchmark</h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">
+            Repeat tests to measure the agent's <strong>latency distribution</strong> (p50/p95/p99) —
+            an agent consistency check, not infrastructure load testing. Results appear in the
+            <strong>⚡ Performance</strong> panel on the Results page; per-test distributions show in each row's detail.
+        </div>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+            <div>
+                <label style="font-size:12px">Scope</label>
+                <select id="benchScope" style="width:auto;margin:0;min-width:200px">
+                    <option value="all">All tests</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px">Repeat (runs each)</label>
+                <input id="benchRepeat" type="number" value="10" min="2" max="50" style="width:90px;margin:0">
+            </div>
+            <button class="btn btn-primary" onclick="runBenchmark()">⚡ Run Benchmark</button>
+            <span id="benchStatus" style="color:#94a3b8;line-height:40px"></span>
+        </div>
+    </div>
 </div>
 
 <!-- ================= RESULTS ================= -->
@@ -862,6 +909,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
 
     <!-- Filters -->
     <div id="resultsRunBanner"></div>
+    <div id="resultsPerfPanel" style="display:none;margin-bottom:15px"></div>
     <div style="display:flex;gap:12px;margin-bottom:15px;align-items:center">
         <span style="font-size:13px;color:#94a3b8">Filter:</span>
         <select id="resultsAgentFilter" onchange="applyResultsFilter()" style="width:auto;margin:0;min-width:150px">
@@ -929,8 +977,11 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
     </div>
 
     <div class="section" id="baselineDiffSection" style="display:none">
-        <h2>Baseline Comparison</h2>
-        <div id="baselineDiffResults"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <h2 style="margin:0">Baseline Comparison</h2>
+            <a id="baselineReportBtn" href="/api/baseline/report" target="_blank" class="btn btn-outline btn-sm" style="display:none;text-decoration:none">📄 Download Report</a>
+        </div>
+        <div id="baselineDiffResults" style="margin-top:12px"></div>
     </div>
 </div>
 
@@ -1073,7 +1124,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             </div>
             <div class="gs-step" style="cursor:default">
                 <div style="font-size:22px">✅</div>
-                <div><div class="gs-title">32 assertions</div><div class="gs-desc">Deterministic checks — JSON shape, latency, cost, no-PII, language, semantic match &amp; more.</div></div>
+                <div><div class="gs-title">34 assertions</div><div class="gs-desc">Deterministic checks — JSON shape, latency, TTFT, throughput, cost, no-PII, language, semantic match &amp; more.</div></div>
             </div>
             <div class="gs-step" style="cursor:default">
                 <div style="font-size:22px">🧪</div>
@@ -1524,6 +1575,8 @@ async function createTestCase() {
             }
         }
         if (type==='latency_under') { const v=document.getElementById('t-latency').value; if(v) assertions.push({latency_under:parseInt(v)}); }
+        if (type==='ttft_under') { const v=document.getElementById('t-ttft').value; if(v) assertions.push({ttft_under:parseInt(v)}); }
+        if (type==='tokens_per_second_over') { const v=document.getElementById('t-tps').value; if(v) assertions.push({tokens_per_second_over:parseFloat(v)}); }
         // Safety & quality assertions
         if (type==='no_pii') {
             const v=(document.getElementById('t-pii-types').value||'').trim();
@@ -2169,9 +2222,37 @@ async function loadSuites() {
         html += `<div style="margin-top:4px;color:#64748b;font-size:12px">Total: ${data.total} tests across ${Object.keys(suites).length} suites</div>`;
         el.innerHTML = html;
 
+        // Populate the benchmark scope dropdown (all tests + individual tests)
+        const benchSel = document.getElementById('benchScope');
+        if (benchSel) {
+            benchSel.innerHTML = '<option value="all">All tests</option>' +
+                (data.test_cases||[]).map(t => `<option value="test:${escH(t.name)}">${escH(t.name)}</option>`).join('');
+        }
+
         // Load execution config (profiles, etc.) for Run page dropdowns
         loadExecutionConfig();
     } catch(e) { console.error(e); }
+}
+
+async function runBenchmark() {
+    const scope = document.getElementById('benchScope').value;
+    const repeat = parseInt(document.getElementById('benchRepeat').value) || 10;
+    const status = document.getElementById('benchStatus');
+    const body = { repeat };
+    if (scope && scope.startsWith('test:')) body.test = scope.slice(5);
+    status.innerHTML = '<span class="spinner"></span> Benchmarking…';
+    showGlobalRunBar('Benchmarking × ' + repeat + ' runs');
+    try {
+        const res = await fetch('/api/run/benchmark', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        if (data.error) { status.innerHTML = `<span style="color:#ef4444">${data.error}</span>`; return; }
+        showStopButtons(true);
+        pollProgress(status, () => {
+            status.innerHTML = '✅ Benchmark done — see the ⚡ Performance panel on Results.';
+            loadResults(); loadHomeResults();
+            setTimeout(()=>{ status.innerHTML=''; showPage('results'); }, 1200);
+        });
+    } catch(e) { status.innerHTML = `<span style="color:#ef4444">Error: ${e}</span>`; }
 }
 
 // Shared polling with live progress
@@ -2212,6 +2293,7 @@ async function runAllTests() {
         || document.getElementById('homeRunStatus') || document.getElementById('runPageStatus');
     if (btn) { btn.disabled=true; btn.textContent='⏳ Running...'; }
     if (status) status.innerHTML = '<span class="spinner"></span> Starting...';
+    showGlobalRunBar('Running all tests…');
     const agent = getSelectedAgent();
     const parallel = parseInt(document.getElementById('runParallel')?.value || '1');
     const profile = document.getElementById('runProfile')?.value || '';
@@ -2231,6 +2313,7 @@ async function runAllTests() {
 async function runSuite(name) {
     const status = document.getElementById('runPageStatus');
     status.innerHTML = '<span class="spinner"></span> Running '+name+'...';
+    showGlobalRunBar('Running suite: '+name);
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/suite/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
@@ -2241,6 +2324,7 @@ async function runSuite(name) {
 async function runSingleTest(name) {
     const status = document.getElementById('runPageStatus');
     status.innerHTML = '<span class="spinner"></span> Running '+name+'...';
+    showGlobalRunBar('Running test: '+name);
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/test/'+encodeURIComponent(name), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
@@ -2251,6 +2335,7 @@ async function runSingleTest(name) {
 async function runByTagFromRun(tagName) {
     const status = document.getElementById('runPageStatus');
     status.innerHTML = '<span class="spinner"></span> Running tag "'+tagName+'"...';
+    showGlobalRunBar('Running tag: '+tagName);
     const agent = getSelectedAgent();
     const body = agent ? {agent} : null;
     await fetch('/api/run/tag/'+encodeURIComponent(tagName), {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
@@ -2296,8 +2381,39 @@ async function loadResults() {
         const currentAgent = agentFilter.value;
         agentFilter.innerHTML = '<option value="">All Agents</option>' + agents.map(a => `<option value="${a}" ${a===currentAgent?'selected':''}>${a}</option>`).join('');
 
+        renderPerfPanel(data.perf);
         applyResultsFilter();
     } catch(e) {}
+}
+
+function renderPerfPanel(perf) {
+    const el = document.getElementById('resultsPerfPanel');
+    if (!el) return;
+    const lat = (perf && perf.latency_ms) || {};
+    if (!perf || (!lat.count && !perf.throughput_rps)) { el.style.display='none'; return; }
+    const ttft = perf.ttft_ms || {};
+    const cell = (label, val, unit, color) =>
+        `<div style="background:#0f1830;border:1px solid #1e2a47;border-radius:8px;padding:10px 12px;text-align:center;min-width:90px">
+            <div style="font-size:18px;font-weight:700;color:${color||'#22d3ee'}">${val}${unit||''}</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;margin-top:3px">${label}</div>
+        </div>`;
+    let cells = '';
+    if (lat.count) {
+        cells += cell('Latency p50', Math.round(lat.p50), ' ms');
+        cells += cell('Latency p95', Math.round(lat.p95), ' ms');
+        cells += cell('Latency p99', Math.round(lat.p99), ' ms');
+        cells += cell('Latency max', Math.round(lat.max), ' ms');
+    }
+    if (perf.throughput_rps) cells += cell('Throughput', perf.throughput_rps, ' req/s', '#a78bfa');
+    if (perf.error_rate != null) cells += cell('Error rate', (perf.error_rate*100).toFixed(1), ' %', perf.error_rate>0?'#ef4444':'#22c55e');
+    if (ttft.count) cells += cell('TTFT p95', Math.round(ttft.p95), ' ms');
+    el.innerHTML = `<div class="section" style="padding:14px 16px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c8aa5;font-weight:600;margin-bottom:10px">⚡ Performance — agent latency distribution
+            <span style="text-transform:none;letter-spacing:0;color:#64748b;font-weight:400;font-size:11px;margin-left:6px">across ${lat.count||0} responses this run</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">${cells}</div>
+    </div>`;
+    el.style.display = 'block';
 }
 
 function applyResultsFilter() {
@@ -2495,10 +2611,26 @@ function renderResultsTable(data, tbodyId, detailed, limit) {
                 costInfo += `<span style="font-size:12px;color:#94a3b8">Total: <strong style="color:#e2e8f0">${r.token_usage.total_tokens}</strong></span>`;
             }
             if(r.estimated_cost > 0) {
-                costInfo += `<span style="font-size:12px;color:#94a3b8">Cost: <strong style="color:#22d3ee">$${r.estimated_cost.toFixed(4)}</strong></span>`;
+                costInfo += `<span style="font-size:12px;color:#94a3b8">Est. cost: <strong style="color:#22d3ee">$${r.estimated_cost.toFixed(5)}</strong> <span style="color:#64748b" title="Estimated from real token usage × the model's per-1K price. Set the agent's model (or pricing override) in Agent Setup for exact cost.">ⓘ</span></span>`;
             }
             costInfo += '</div></div>';
             detailContent += costInfo;
+        }
+
+        // Show per-test micro-benchmark (repeat:N latency distribution)
+        if(r.benchmark && r.benchmark.count) {
+            const b = r.benchmark;
+            detailContent += `<div style="padding:8px 12px;background:#1e293b;border-radius:6px;margin-bottom:8px">
+                <div style="font-size:11px;color:#22d3ee;margin-bottom:6px">⚡ Latency benchmark <span style="color:#64748b">(${b.runs||b.count} runs)</span>:</div>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#94a3b8">
+                    <span>min <strong style="color:#e2e8f0">${Math.round(b.min)}ms</strong></span>
+                    <span>p50 <strong style="color:#e2e8f0">${Math.round(b.p50)}ms</strong></span>
+                    <span>p95 <strong style="color:#e2e8f0">${Math.round(b.p95)}ms</strong></span>
+                    <span>p99 <strong style="color:#e2e8f0">${Math.round(b.p99)}ms</strong></span>
+                    <span>max <strong style="color:#e2e8f0">${Math.round(b.max)}ms</strong></span>
+                    <span>mean <strong style="color:#e2e8f0">${Math.round(b.mean)}ms</strong></span>
+                </div>
+            </div>`;
         }
 
         // Show conversation messages
@@ -2946,44 +3078,95 @@ async function diffBaselines() {
                 clearInterval(poll);
                 showStopButtons(false);
                 el.innerHTML = '';
-                // Read diffs from the status response directly
-                const diffs = s.baseline_diffs;
-                const section = document.getElementById('baselineDiffSection');
-                const diffEl = document.getElementById('baselineDiffResults');
-                if (diffs && diffs.length > 0) {
-                    section.style.display = 'block';
-                    const changes = diffs.filter(d => d.status === 'changed').length;
-                    const matches = diffs.filter(d => d.status === 'match').length;
-                    let html = `<div style="margin-bottom:12px;font-size:13px">
-                        <span style="color:#22c55e">✅ ${matches} match</span> · 
-                        <span style="color:#ef4444">🔄 ${changes} changed</span> · 
-                        <span style="color:#64748b">⏭️ ${diffs.filter(d=>d.status==='no_baseline').length} no baseline</span>
-                    </div>`;
-                    html += diffs.map(d => {
-                        const icon = d.status === 'match' ? '✅' : d.status === 'changed' ? '🔄' : '⏭️';
-                        const color = d.status === 'match' ? '#22c55e' : d.status === 'changed' ? '#ef4444' : '#64748b';
-                        let detail = '';
-                        if (d.status === 'changed') {
-                            detail = `<div style="font-size:12px;color:#fca5a5;margin-top:4px;white-space:pre-wrap">${d.details||''}</div>`;
-                            const badges = [];
-                            if (d.content_match === false) badges.push('<span style="background:#ef444420;color:#ef4444;padding:2px 6px;border-radius:3px;font-size:10px">content</span>');
-                            if (d.tool_calls_match === false) badges.push('<span style="background:#f9731620;color:#f97316;padding:2px 6px;border-radius:3px;font-size:10px">tools</span>');
-                            if (d.routing_match === false) badges.push('<span style="background:#a78bfa20;color:#a78bfa;padding:2px 6px;border-radius:3px;font-size:10px">routing</span>');
-                            if (badges.length) detail = '<div style="margin-top:4px">' + badges.join(' ') + '</div>' + detail;
-                        }
-                        return `<div style="padding:8px 0;border-bottom:1px solid #334155">
-                            <span style="color:${color}">${icon}</span> <strong>${d.scenario}</strong> <span style="color:#64748b;font-size:12px">(${d.agent})</span>
-                            ${detail}
-                        </div>`;
-                    }).join('');
-                    diffEl.innerHTML = html;
-                } else {
-                    section.style.display = 'block';
-                    diffEl.innerHTML = '<div style="color:#475569">No comparison data available.</div>';
-                }
+                renderBaselineDiffs(s.baseline_diffs);
             }
         }, 1500);
     } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+function _escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+}
+
+function _diffPair(title, baseVal, curVal, changed) {
+    const stateColor = changed ? '#ef4444' : '#22c55e';
+    const stateText = changed ? 'changed' : 'unchanged';
+    return `<div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#7c8aa5;margin-bottom:6px">
+            <span>${_escHtml(title)}</span><span style="color:${stateColor};font-weight:700">${stateText}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#0f1830;border:1px solid #1e2a47;border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Baseline (golden)</div>
+                <pre style="white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:#cbd5e1;margin:0">${_escHtml(baseVal) || '—'}</pre>
+            </div>
+            <div style="background:#0f1830;border:1px solid #1e2a47;border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Current</div>
+                <pre style="white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:#cbd5e1;margin:0">${_escHtml(curVal) || '—'}</pre>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderBaselineDiffs(diffs) {
+    const section = document.getElementById('baselineDiffSection');
+    const diffEl = document.getElementById('baselineDiffResults');
+    const reportBtn = document.getElementById('baselineReportBtn');
+    section.style.display = 'block';
+    if (!diffs || diffs.length === 0) {
+        diffEl.innerHTML = '<div style="color:#475569">No comparison data available.</div>';
+        if (reportBtn) reportBtn.style.display = 'none';
+        return;
+    }
+    if (reportBtn) reportBtn.style.display = 'inline-flex';
+
+    const changes = diffs.filter(d => d.status === 'changed').length;
+    const matches = diffs.filter(d => d.status === 'match').length;
+    const none = diffs.filter(d => d.status === 'no_baseline').length;
+
+    let html = `<div style="margin-bottom:14px;font-size:13px">
+        <span style="color:#22c55e">✅ ${matches} match</span> · 
+        <span style="color:#ef4444">🔄 ${changes} changed</span> · 
+        <span style="color:#64748b">⏭️ ${none} no baseline</span>
+    </div>`;
+
+    html += diffs.map((d, i) => {
+        const icon = d.status === 'match' ? '✅' : d.status === 'changed' ? '🔄' : '⏭️';
+        const color = d.status === 'match' ? '#22c55e' : d.status === 'changed' ? '#ef4444' : '#64748b';
+        const label = d.status === 'match' ? 'Match' : d.status === 'changed' ? 'Changed' : 'No baseline';
+
+        let body = '';
+        if (d.status === 'changed') {
+            const badges = [];
+            if (d.content_match === false) badges.push('<span style="background:#ef444422;color:#ef4444;padding:2px 7px;border-radius:4px;font-size:10px">content</span>');
+            if (d.tool_calls_match === false) badges.push('<span style="background:#f9731622;color:#f97316;padding:2px 7px;border-radius:4px;font-size:10px">tools</span>');
+            if (d.routing_match === false) badges.push('<span style="background:#a78bfa22;color:#a78bfa;padding:2px 7px;border-radius:4px;font-size:10px">routing</span>');
+            if (badges.length) body += '<div style="margin:8px 0">' + badges.join(' ') + '</div>';
+            body += _diffPair('Response content', d.baseline_content, d.current_content, d.content_match === false);
+            if (d.tool_calls_match === false) body += _diffPair('Tool calls', (d.baseline_tools||[]).join(', '), (d.current_tools||[]).join(', '), true);
+            if (d.routing_match === false) body += _diffPair('Routing path', (d.baseline_routing||[]).join(' → '), (d.current_routing||[]).join(' → '), true);
+        } else if (d.status === 'match') {
+            body = '<div style="color:#94a3b8;font-size:13px;padding:8px 0">No changes — current response matches the saved baseline.</div>';
+        } else {
+            body = '<div style="color:#94a3b8;font-size:13px;padding:8px 0">No baseline saved for this scenario yet. Click “Save New Baselines” to snapshot it.</div>';
+        }
+
+        const borderColor = d.status === 'match' ? '#22c55e' : d.status === 'changed' ? '#ef4444' : '#64748b';
+        return `<div class="bl-card" id="bl-card-${i}" style="background:#111a2e;border:1px solid #1e2a47;border-left:4px solid ${borderColor};border-radius:10px;margin-bottom:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer" onclick="document.getElementById('bl-card-${i}').classList.toggle('open')">
+                <span style="color:${color}">${icon}</span>
+                <strong style="color:#f8fafc">${_escHtml(d.scenario)}</strong>
+                <span style="color:#818cf8;font-size:12px;flex:1">${_escHtml(d.agent)}</span>
+                <span style="color:${color};font-size:12px;font-weight:600">${label}</span>
+                <span class="bl-chevron" style="color:#475569">▾</span>
+            </div>
+            <div class="bl-body" style="display:none;padding:6px 16px 16px">${body}</div>
+        </div>`;
+    }).join('');
+
+    diffEl.innerHTML = html;
 }
 
 async function clearBaselines() {
@@ -3038,6 +3221,57 @@ async function saveExecutionSettings() {
     if (el) el.textContent = greet + ' — welcome to ATTEST';
 })();
 loadHomeResults();
+
+// ===== Global run bar — visible on every page while a run is active =====
+let _globalRunWasRunning = false;
+
+// Show the bar immediately on click (mock runs can finish faster than the poll interval).
+function showGlobalRunBar(title) {
+    const bar = document.getElementById('globalRunBar');
+    const main = document.querySelector('.main');
+    if (!bar) return;
+    document.getElementById('globalRunTitle').textContent = title || 'Running tests…';
+    document.getElementById('globalRunDetail').textContent = '';
+    document.getElementById('globalRunFill').style.width = '0%';
+    bar.style.display = 'block';
+    if (main) main.style.paddingTop = (bar.offsetHeight + 16) + 'px';
+    _globalRunWasRunning = true;
+}
+
+async function pollGlobalRunBar() {
+    const bar = document.getElementById('globalRunBar');
+    const main = document.querySelector('.main');
+    if (!bar) return;
+    try {
+        const d = await (await fetch('/api/status')).json();
+        if (d.is_running) {
+            const p = d.progress || {};
+            const total = p.total || 0;
+            const done = p.completed || 0;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            document.getElementById('globalRunTitle').textContent =
+                total ? `Running tests — ${done}/${total}` : 'Running tests…';
+            document.getElementById('globalRunDetail').textContent =
+                p.current ? `Current: ${p.current}` : '';
+            document.getElementById('globalRunFill').style.width = pct + '%';
+            bar.style.display = 'block';
+            if (main) main.style.paddingTop = (bar.offsetHeight + 16) + 'px';
+            _globalRunWasRunning = true;
+        } else {
+            bar.style.display = 'none';
+            if (main) main.style.paddingTop = '';
+            // When a run just finished, refresh whatever results view is open.
+            if (_globalRunWasRunning) {
+                _globalRunWasRunning = false;
+                const resultsActive = document.getElementById('page-results')?.classList.contains('active');
+                if (resultsActive && typeof loadResults === 'function') loadResults();
+                if (typeof loadHomeResults === 'function') loadHomeResults();
+            }
+        }
+    } catch (e) { /* server momentarily unavailable — ignore */ }
+}
+setInterval(pollGlobalRunBar, 800);
+pollGlobalRunBar();
 </script>
 </body>
 </html>

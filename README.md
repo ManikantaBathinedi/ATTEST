@@ -41,7 +41,7 @@
 Testing AI agents is hard. Responses are non-deterministic, tool calls are invisible, and safety risks are subtle. Existing tools solve pieces of the puzzle — ATTEST puts them together:
 
 - **Write tests in YAML** — no code needed for common scenarios
-- **32 deterministic assertions** — content, tool calls, JSON structure, routing, latency, cost, PII, language, semantic similarity, golden baselines
+- **34 deterministic assertions** — content, tool calls, JSON structure, routing, latency, TTFT, throughput, cost, PII, language, semantic similarity, golden baselines
 - **36 LLM evaluators** — score relevancy, correctness, bias, toxicity, groundedness across 4 backends (built-in, DeepEval, Azure AI Evaluation, RAGAS)
 - **Multi-turn conversations** — test booking flows, multi-step tasks, context retention
 - **User simulation** — LLM plays realistic personas to find edge cases humans miss
@@ -61,7 +61,7 @@ CI-ready package.
 
 | Capability | ATTEST | LangSmith | DeepEval | Promptfoo | Ragas |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Deterministic assertions (tools, JSON, routing, latency) | ✅ 32 | ⚠️ basic | ⚠️ limited | ✅ | ❌ |
+| Deterministic assertions (tools, JSON, routing, latency) | ✅ 34 | ⚠️ basic | ⚠️ limited | ✅ | ❌ |
 | LLM-as-judge evaluators | ✅ 36 | ✅ | ✅ | ✅ | ✅ |
 | Multiple eval backends in one tool | ✅ 4 | ❌ | ❌ | ⚠️ | ❌ |
 | RAG evaluation (faithfulness, context recall) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ |

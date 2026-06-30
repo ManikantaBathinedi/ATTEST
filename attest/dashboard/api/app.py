@@ -40,6 +40,8 @@ _is_running: bool = False
 _cancel_requested: bool = False
 _config_path: Optional[str] = None
 _run_progress: Dict[str, Any] = {"total": 0, "completed": 0, "current": "", "results": []}
+# Last baseline comparison (kept so the user can download a report after the run).
+_last_baseline_diffs: Dict[str, Any] = {"diffs": [], "timestamp": ""}
 
 
 def set_config_path(path: Optional[str]) -> None:
@@ -1213,7 +1215,35 @@ async def run_single_test(test_name: str, request: Request, background_tasks: Ba
     return {"message": f"Running test: {test_name}{' with ' + agent_override if agent_override else ''}"}
 
 
-async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: Optional[str] = None, tag_filter: Optional[str] = None, agent_override: Optional[str] = None):
+@app.post("/api/run/benchmark")
+async def run_benchmark(request: Request, background_tasks: BackgroundTasks):
+    """Run a latency benchmark — repeat a test (or all tests) N times.
+
+    Body: {"test": "name" (optional), "tag": "name" (optional), "repeat": 10}
+    Measures the agent's latency distribution (p50/p95/p99) — an agent-level
+    consistency check, not infrastructure load testing.
+    """
+    global _is_running
+    if _is_running:
+        return JSONResponse({"error": "Tests are already running."}, status_code=409)
+    test_name = tag = None
+    repeat = 10
+    try:
+        body = await request.json()
+        test_name = body.get("test")
+        tag = body.get("tag")
+        repeat = max(2, min(int(body.get("repeat", 10)), 50))
+    except Exception:
+        pass
+    _is_running = True
+    background_tasks.add_task(
+        _execute_tests, test_name_filter=test_name, tag_filter=tag, benchmark_repeat=repeat
+    )
+    scope = test_name or (f"tag:{tag}" if tag else "all tests")
+    return {"message": f"Benchmarking {scope} × {repeat} runs"}
+
+
+async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: Optional[str] = None, tag_filter: Optional[str] = None, agent_override: Optional[str] = None, benchmark_repeat: int = 0):
     global _latest_summary, _is_running, _run_progress, _cancel_requested
     _cancel_requested = False
     try:
@@ -1245,6 +1275,11 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
         if agent_override:
             for tc in test_cases:
                 tc.agent = agent_override
+
+        # Benchmark mode: repeat each test N times to measure latency distribution.
+        if benchmark_repeat and benchmark_repeat > 1:
+            for tc in test_cases:
+                tc.repeat = int(benchmark_repeat)
 
         if not test_cases:
             _is_running = False
@@ -1333,8 +1368,29 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         history_dir = output_dir / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
-        history_path = history_dir / f"run_{timestamp}.json"
+        run_id = f"run_{timestamp}"
+        history_path = history_dir / f"{run_id}.json"
         history_path.write_text(new_summary.model_dump_json(indent=2), encoding="utf-8")
+
+        # Auto-name the run by what was executed, so it's identifiable in
+        # History / Compare without the user having to rename it.
+        if suite_filter:
+            scope = f"Suite: {suite_filter}"
+        elif tag_filter:
+            scope = f"Tag: {tag_filter}"
+        elif test_name_filter:
+            scope = f"Test: {test_name_filter}"
+        else:
+            scope = "All tests"
+        if agent_override:
+            scope += f" · {agent_override}"
+        scope += f" · {new_summary.passed}/{new_summary.total}"
+        try:
+            labels = _load_run_labels()
+            labels[run_id] = scope
+            _save_run_labels(labels)
+        except Exception:
+            pass
 
         from attest.reporting.html_report import generate_html_report
         generate_html_report(new_summary, output_path=str(output_dir / "report.html"))
@@ -1930,7 +1986,7 @@ async def baseline_diff(background_tasks: BackgroundTasks):
 
 
 async def _execute_baseline_diff():
-    global _is_running, _run_progress, _cancel_requested
+    global _is_running, _run_progress, _cancel_requested, _last_baseline_diffs
     _cancel_requested = False
     try:
         from attest.utils.baseline import compare_with_baseline
@@ -1951,20 +2007,29 @@ async def _execute_baseline_diff():
             diff = compare_with_baseline(result)
             if diff is None:
                 diffs.append({"scenario": result.scenario, "agent": result.agent, "status": "no_baseline"})
-            elif diff["all_match"]:
-                diffs.append({"scenario": result.scenario, "agent": result.agent, "status": "match"})
             else:
-                diffs.append({
+                entry = {
                     "scenario": result.scenario,
                     "agent": result.agent,
-                    "status": "changed",
-                    "details": diff["details"],
+                    "status": "match" if diff["all_match"] else "changed",
                     "content_match": diff["content_match"],
                     "tool_calls_match": diff["tool_calls_match"],
                     "routing_match": diff["routing_match"],
-                })
+                    "details": diff.get("details", ""),
+                    # Full before/after for the expandable detail view + report.
+                    "baseline_content": diff.get("baseline_content", ""),
+                    "current_content": diff.get("current_content", ""),
+                    "baseline_tools": diff.get("baseline_tools", []),
+                    "current_tools": diff.get("current_tools", []),
+                    "baseline_routing": diff.get("baseline_routing", []),
+                    "current_routing": diff.get("current_routing", []),
+                }
+                diffs.append(entry)
 
         _run_progress["baseline_diffs"] = diffs
+        _last_baseline_diffs["diffs"] = diffs
+        from datetime import datetime as _dt
+        _last_baseline_diffs["timestamp"] = _dt.utcnow().isoformat()
     except Exception as e:
         print(f"Baseline diff error: {e}")
     finally:
@@ -1979,6 +2044,32 @@ async def baseline_clear():
     if baseline_dir.exists():
         shutil.rmtree(baseline_dir)
     return {"message": "All baselines deleted"}
+
+
+@app.get("/api/baseline/diff/latest")
+async def baseline_diff_latest():
+    """Return the most recent baseline comparison (for re-rendering / report)."""
+    return {
+        "diffs": _last_baseline_diffs.get("diffs", []),
+        "timestamp": _last_baseline_diffs.get("timestamp", ""),
+    }
+
+
+@app.get("/api/baseline/report")
+async def baseline_report():
+    """Download an HTML report of the most recent baseline comparison."""
+    diffs = _last_baseline_diffs.get("diffs", [])
+    if not diffs:
+        return JSONResponse(
+            {"error": "No baseline comparison yet. Run 'Compare with Baselines' first."},
+            status_code=404,
+        )
+    from attest.reporting.baseline_report import generate_baseline_report
+    html = generate_baseline_report(diffs, timestamp=_last_baseline_diffs.get("timestamp", ""))
+    return HTMLResponse(
+        content=html,
+        headers={"Content-Disposition": "attachment; filename=attest_baseline_comparison.html"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2154,8 +2245,28 @@ async def _execute_tests_advanced(
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         history_dir = output_dir / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
-        history_path = history_dir / f"run_{timestamp}.json"
+        run_id = f"run_{timestamp}"
+        history_path = history_dir / f"{run_id}.json"
         history_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
+
+        # Auto-name the run by what was executed (identifiable in History / Compare).
+        if suite_filter:
+            scope = f"Suite: {suite_filter}"
+        elif tag_filter:
+            scope = f"Tag: {tag_filter}"
+        else:
+            scope = "All tests"
+        if agent_override:
+            scope += f" · {agent_override}"
+        if profile:
+            scope += f" · {profile}"
+        scope += f" · {summary.passed}/{summary.total}"
+        try:
+            labels = _load_run_labels()
+            labels[run_id] = scope
+            _save_run_labels(labels)
+        except Exception:
+            pass
 
         from attest.reporting.html_report import generate_html_report
         generate_html_report(summary, output_path=str(output_dir / "report.html"))

@@ -142,4 +142,11 @@ def compare_with_baseline(
         "routing_match": routing_match,
         "all_match": content_match and tool_calls_match and routing_match,
         "details": "\n".join(details) if details else "No changes detected.",
+        # Full before/after values for a detailed, expandable comparison view.
+        "baseline_content": baseline_content,
+        "current_content": current_content,
+        "baseline_tools": baseline_tools,
+        "current_tools": current_tools,
+        "baseline_routing": baseline_routing,
+        "current_routing": current_routing,
     }

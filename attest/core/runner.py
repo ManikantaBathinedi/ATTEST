@@ -44,6 +44,7 @@ from attest.core.models import (
 )
 from attest.evaluation.interface import EvaluationInput
 from attest.evaluation.registry import EvaluatorRegistry
+from attest.core.pricing import estimate_cost
 from attest.utils.response_cache import ResponseCache
 from attest.utils.rate_limiter import RateLimiter
 from attest.utils.tracing import span, set_span_attr
@@ -170,6 +171,16 @@ class TestRunner:
 
         summary.duration_seconds = time.perf_counter() - start_time
 
+        # Aggregate performance stats (latency/TTFT/token/cost percentiles).
+        try:
+            from attest.perf.stats import compute_perf_stats
+            perf = compute_perf_stats(summary.results)
+            if summary.duration_seconds > 0:
+                perf["throughput_rps"] = round(summary.total / summary.duration_seconds, 2)
+            summary.perf = perf
+        except Exception:
+            summary.perf = {}
+
         if verbose:
             self._print_summary(summary)
 
@@ -196,11 +207,50 @@ class TestRunner:
             # rather than the placeholder "default" used by scenario files
             # that omit an explicit agent.
             result.agent = self._resolve_agent_name(result.agent)
+            # Optional per-test micro-benchmark (repeat N times → latency dist).
+            if (test_case.repeat or 0) > 1 and test_case.type == "single_turn":
+                await self._benchmark_test(test_case, result)
             set_span_attr(s, "attest.status", result.status.value)
             set_span_attr(s, "attest.latency_ms", round(result.latency_ms))
             if result.error:
                 set_span_attr(s, "attest.error", result.error)
             return result
+
+    async def _benchmark_test(self, test_case: TestCase, result: TestResult) -> None:
+        """Run the agent call ``repeat`` times to measure latency consistency.
+
+        Only the lightweight agent call is repeated (no evaluators), and the
+        response cache is bypassed so each call is a real measurement. Attaches
+        a latency distribution to ``result.benchmark``.
+        """
+        from attest.perf.stats import summarize_latencies
+
+        adapter = self._get_adapter(test_case.agent)
+        if adapter is None:
+            return
+        runs = max(2, min(int(test_case.repeat), 50))  # safety cap
+        latencies: List[float] = []
+        # Seed with the latency already measured in the main run.
+        if result.latency_ms:
+            latencies.append(float(result.latency_ms))
+        history = test_case.conversation_history or None
+        timeout_seconds = test_case.timeout or 30
+        remaining = runs - len(latencies)
+        for _ in range(max(0, remaining)):
+            try:
+                if self._rate_limiter:
+                    await self._rate_limiter.acquire()
+                resp = await asyncio.wait_for(
+                    adapter.send_message(message=test_case.input, conversation_history=history),
+                    timeout=timeout_seconds,
+                )
+                latencies.append(float(resp.latency_ms or 0))
+            except Exception:
+                pass  # A failed sample shouldn't break the benchmark
+        if latencies:
+            bench = summarize_latencies(latencies)
+            bench["runs"] = len(latencies)
+            result.benchmark = bench
 
     async def _run_single_dispatch(self, test_case: TestCase) -> TestResult:
         """Pick the right runner for this test case's type."""
@@ -476,6 +526,7 @@ class TestRunner:
         ]
         result.tool_calls = response.tool_calls
         result.latency_ms = response.latency_ms
+        result.time_to_first_token_ms = response.time_to_first_token_ms
         result.token_usage = response.token_usage
 
         # Track multi-agent routing info
@@ -514,6 +565,7 @@ class TestRunner:
 
         # Step 6: Calculate timing and cost
         result.duration_ms = (time.perf_counter() - start_time) * 1000
+        result.estimated_cost = self._compute_cost(test_case.agent, response.token_usage)
 
         return result
 
@@ -689,7 +741,25 @@ class TestRunner:
         if agent_name == "default" and self._config.agents:
             return next(iter(self._config.agents))
         return agent_name
+    def _compute_cost(self, agent_name: str, token_usage) -> float:
+        """Estimate USD cost from real token usage and the agent's model price.
 
+        Uses per-agent ``pricing`` overrides if set, else the agent's ``model``
+        name against the built-in price table, else a default rate. Returns 0.0
+        when the agent reported no token usage (e.g. the offline mock agent).
+        """
+        if token_usage is None:
+            return 0.0
+        resolved = self._resolve_agent_name(agent_name)
+        agent_cfg = self._config.agents.get(resolved)
+        model = getattr(agent_cfg, "model", None) if agent_cfg else None
+        pricing = getattr(agent_cfg, "pricing", None) if agent_cfg else None
+        return estimate_cost(
+            token_usage,
+            model=model,
+            input_per_1k=getattr(pricing, "input_per_1k", None) if pricing else None,
+            output_per_1k=getattr(pricing, "output_per_1k", None) if pricing else None,
+        )
     async def _setup_adapters(self, test_cases: List[TestCase]) -> None:
         """Create and setup adapters for all agents used in the test cases."""
         # Find all unique agent names
@@ -817,6 +887,20 @@ class TestRunner:
         table.add_row("Overall Score", f"{summary.overall_score:.2f}")
         table.add_row("Duration", f"{summary.duration_seconds:.1f}s")
         table.add_row("Est. Cost", f"${summary.total_cost:.4f}")
+
+        # Performance percentiles (agent latency distribution)
+        perf = summary.perf or {}
+        lat = perf.get("latency_ms") or {}
+        if lat.get("count"):
+            table.add_row(
+                "Latency p50 / p95 / p99",
+                f"{lat.get('p50', 0):.0f} / {lat.get('p95', 0):.0f} / {lat.get('p99', 0):.0f} ms",
+            )
+        if perf.get("throughput_rps"):
+            table.add_row("Throughput", f"{perf['throughput_rps']:.2f} req/s")
+        ttft = perf.get("ttft_ms") or {}
+        if ttft.get("count"):
+            table.add_row("TTFT p95", f"{ttft.get('p95', 0):.0f} ms")
 
         # Show cache stats if caching is enabled
         if self._cache and self._cache.hits > 0:

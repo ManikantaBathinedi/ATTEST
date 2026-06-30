@@ -415,6 +415,63 @@ def assert_latency_under(ms: int) -> AssertionFn:
     return check
 
 
+def assert_ttft_under(ms: int) -> AssertionFn:
+    """Check that the streaming time-to-first-token is under the given ms.
+
+    Skips (passes) if the agent did not report a TTFT (non-streaming adapter).
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        ttft = response.time_to_first_token_ms
+        if ttft is None:
+            return AssertionResult(
+                name=f"ttft_under:{ms}ms",
+                passed=True,
+                message="No time-to-first-token reported (non-streaming) — skipped.",
+            )
+        if ttft <= ms:
+            return AssertionResult(name=f"ttft_under:{ms}ms", passed=True)
+        return AssertionResult(
+            name=f"ttft_under:{ms}ms",
+            passed=False,
+            message=f"Time-to-first-token {ttft:.0f}ms exceeds limit of {ms}ms.",
+            expected=ms,
+            actual=round(ttft, 1),
+        )
+
+    return check
+
+
+def assert_tokens_per_second_over(min_tps: float) -> AssertionFn:
+    """Check that output throughput (output tokens / latency) is at least min_tps.
+
+    Skips (passes) if token usage or latency is unavailable.
+    """
+
+    def check(response: AgentResponse) -> AssertionResult:
+        usage = response.token_usage
+        latency_s = (response.latency_ms or 0) / 1000.0
+        if usage is None or latency_s <= 0:
+            return AssertionResult(
+                name=f"tokens_per_second_over:{min_tps}",
+                passed=True,
+                message="No token usage / latency to compute throughput — skipped.",
+            )
+        out = usage.output_tokens or usage.total_tokens or 0
+        tps = out / latency_s if latency_s > 0 else 0.0
+        if tps >= min_tps:
+            return AssertionResult(name=f"tokens_per_second_over:{min_tps}", passed=True)
+        return AssertionResult(
+            name=f"tokens_per_second_over:{min_tps}",
+            passed=False,
+            message=f"Throughput {tps:.1f} tok/s is below minimum {min_tps} tok/s.",
+            expected=min_tps,
+            actual=round(tps, 1),
+        )
+
+    return check
+
+
 def assert_token_usage_under(max_tokens: int) -> AssertionFn:
     """Check that total token usage is under the limit."""
 
@@ -1256,6 +1313,8 @@ def resolve_assertion(assertion_dict: Dict[str, Any]) -> Optional[AssertionFn]:
         # Performance assertions
         "latency_under": lambda v: assert_latency_under(int(v)),
         "token_usage_under": lambda v: assert_token_usage_under(int(v)),
+        "ttft_under": lambda v: assert_ttft_under(int(v)),
+        "tokens_per_second_over": lambda v: assert_tokens_per_second_over(float(v)),
         # Structured output / JSON assertions
         "response_is_json": lambda v: assert_response_is_json(),
         "json_schema": lambda v: assert_json_schema(v),

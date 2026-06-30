@@ -91,12 +91,28 @@ class MockConfig(BaseModel):
     routing_path: List[str] = Field(default_factory=list)
 
 
+class PricingConfig(BaseModel):
+    """Optional per-agent token price overrides (USD per 1,000 tokens).
+
+    When set, these override the built-in model price table for exact,
+    account-specific cost. Leave unset to price by the agent's ``model`` name.
+    """
+
+    input_per_1k: Optional[float] = None
+    output_per_1k: Optional[float] = None
+
+
 class AgentConfig(BaseModel):
     """Configuration for a single agent connection."""
 
     type: str = "http"  # http, websocket, callable, foundry_prompt, foundry_hosted, a2a, mcp, mock
     endpoint: Optional[str] = None
     agent_id: Optional[str] = None
+
+    # Model name (used for token-cost estimation, e.g. "gpt-4o", "azure/gpt-4.1-mini")
+    model: Optional[str] = None
+    # Per-agent token price overrides (USD per 1k tokens) — exact cost if your rate differs
+    pricing: PricingConfig = Field(default_factory=PricingConfig)
 
     # Foundry-specific
     agent_name: Optional[str] = None  # Foundry agent name (e.g. "Travel-Agent")

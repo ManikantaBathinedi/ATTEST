@@ -408,6 +408,44 @@ tests:
 
 ---
 
+## 10. Performance Tests
+
+ATTEST treats latency, time-to-first-token, throughput, and cost as **first-class quality
+gates** — not infrastructure load testing (use k6 / Locust for concurrent load). Two things:
+
+### Per-response SLA assertions
+Gate any test on speed and size:
+```yaml
+tests:
+  - name: fast_greeting
+    input: "Hello!"
+    assertions:
+      - latency_under: 2000          # total response under 2s
+      - ttft_under: 800              # streaming: first token under 800ms
+      - tokens_per_second_over: 20   # output throughput >= 20 tok/s
+      - token_usage_under: 500       # response under 500 tokens
+```
+
+### Latency benchmark (repeat:N)
+Run a test multiple times to measure the agent's **latency consistency** (LLM latency
+varies run-to-run). Reports a distribution (p50/p95/p99):
+```yaml
+tests:
+  - name: greeting_latency
+    input: "Hello!"
+    repeat: 10                       # run 10× and report the distribution
+    assertions:
+      - latency_under: 3000
+```
+
+> **In the dashboard:** the **Run Tests** page has a **⚡ Performance Benchmark** panel — pick a
+> scope and repeat count, click run, and see the latency distribution in the **⚡ Performance**
+> card on the Results page. Every normal run also shows aggregate p50/p95/p99 latency,
+> throughput, and error rate. A ready example lives at
+> [tests/scenarios/example_performance.yaml](../tests/scenarios/example_performance.yaml).
+
+---
+
 ## Creation Methods Summary
 
 | Method | Best for | Supports |
@@ -422,7 +460,7 @@ tests:
 
 ---
 
-## All 32 Assertions Reference
+## All 34 Assertions Reference
 
 ### Response Content (6)
 | YAML Key | Example | Description |
@@ -483,11 +521,13 @@ in-process graph adapter such as LangGraph/CrewAI/AutoGen). See
 |----------|---------|-------------|
 | `matches_baseline: true` | `{base_dir: "baselines"}` | Matches the saved golden response |
 
-### Performance (2)
+### Performance (4)
 | YAML Key | Example | Description |
 |----------|---------|-------------|
 | `latency_under: 5000` | — | Response under N ms |
 | `token_usage_under: 500` | — | Under N tokens |
+| `ttft_under: 800` | — | Streaming time-to-first-token under N ms (skipped if not streaming) |
+| `tokens_per_second_over: 20` | — | Output throughput at least N tokens/sec |
 
 ---
 

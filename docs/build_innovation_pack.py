@@ -74,7 +74,7 @@ M3_SUB = "Production incidents & LLM eval spend (caching)"
 SOLUTION = (
     "ATTEST is an end-to-end agent testing framework that standardizes how agents are "
     "validated before and after release.\n"
-    "32 deterministic assertions verify tool calls, JSON, routing, content, PII, cost & performance\n"
+    "34 deterministic assertions verify tool calls, JSON, routing, content, PII, cost & performance\n"
     "36 LLM-based evaluators across 4 backends (built-in, DeepEval, Azure AI & RAGAS) score quality, safety & groundedness\n"
     "Multi-turn conversations, user simulation & security red-teaming (30 attacks) stress-test agents\n"
     "Golden baselines detect regressions; web dashboard + CLI + CI deliver repeatable quality gates"
@@ -89,7 +89,7 @@ BUSINESS_VALUE = (
 )
 
 KEY_TECH = (
-    "Deterministic Assertion Engine \u2013 32 checks for tool calls, JSON, routing, content, PII, cost & performance\n"
+    "Deterministic Assertion Engine \u2013 34 checks for tool calls, JSON, routing, content, PII, cost & performance\n"
     "LLM Evaluator Suite \u2013 36 evaluators across 4 backends: built-in, DeepEval, Azure AI Evaluation & RAGAS\n"
     "9 Pluggable Adapters \u2013 Foundry, HTTP REST, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants & MCP (plus offline mock)\n"
     "Multi-turn, user simulation, security red-teaming (30 attacks) & multi-agent routing assertions\n"
@@ -97,7 +97,7 @@ KEY_TECH = (
 )
 
 STATE = (
-    "Core framework, 32 assertions, 36 evaluators (4 backends), 9 adapters, security red-teaming, baselines & 9-page dashboard are built and working\n"
+    "Core framework, 34 assertions, 36 evaluators (4 backends), 9 adapters, security red-teaming, baselines & 9-page dashboard are built and working\n"
     "Next Steps\n"
     "Pilot on real production agents\n"
     "Broaden multi-agent / A2A & MCP scenario coverage\n"

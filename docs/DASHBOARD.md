@@ -55,12 +55,15 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 - **Run by Tag**: Expandable tag-suite cards, each with its own ▶ Run Suite button
 - **File suites**: Expandable with individual test run buttons
 - **Run All Tests** + **Stop** (cancel a run in progress)
+- **⚡ Performance Benchmark**: pick a scope (all / one test) + repeat count to measure the
+  agent's latency distribution (p50/p95/p99) — an agent consistency check, not load testing
 
 ### 6. Results
 - **Filters**: By agent, by status (passed/failed/error)
+- **⚡ Performance panel**: run-level latency p50/p95/p99, throughput (req/s), error rate, TTFT p95
 - **Score badges**: Compact "X.XX avg · N/M ✓" pill; full per-evaluator grid in the detail
 - **Expandable details**: Evaluation scores, assertions, **🔀 routing path & handled-by**, tool
-  calls, token usage/cost, and the full conversation trace
+  calls, token usage/cost, **⚡ latency benchmark distribution**, and the full conversation trace
 - **Run History**, **Compare Runs** (run-vs-run diff), **Clear Results**, **HTML Report**, **Export CSV**
 
 ### 7. Baselines

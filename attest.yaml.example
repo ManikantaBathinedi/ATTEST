@@ -51,6 +51,11 @@ agents:
     endpoint: "https://your-resource.services.ai.azure.com/api/projects/your-project"
     agent_name: "Your-Agent-Name"
     agent_version: "1"
+    # model: "gpt-4o"          # Optional: the model your agent uses — enables
+    #                          # accurate token-cost estimates in Results.
+    # pricing:                 # Optional: exact USD per 1,000 tokens if your
+    #   input_per_1k: 0.0025   # billing rate differs from the built-in table.
+    #   output_per_1k: 0.01
 
   # ----------------------------------------------------------
   # HTTP/REST API Agent (uncomment to use)
@@ -60,6 +65,7 @@ agents:
   # my_http_agent:
   #   type: http
   #   endpoint: "http://localhost:8000"
+  #   model: "gpt-4o-mini"                 # Optional: for token-cost estimates
   #   request:
   #     path: "/chat"                      # POST endpoint path
   #     body_template:
@@ -68,6 +74,7 @@ agents:
   #   response:
   #     content_path: "$.response"         # JSONPath to extract agent's reply
   #     tool_calls_path: "$.tool_calls"    # Optional: JSONPath for tool calls
+  #     token_usage_path: "$.usage"        # Optional: JSONPath to token usage (enables cost)
   #   headers:
   #     Authorization: "Bearer ${MY_API_KEY}"  # Reference from .env
 
