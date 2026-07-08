@@ -180,6 +180,9 @@ class EvaluationConfig(BaseModel):
     judge: JudgeConfig = Field(default_factory=JudgeConfig)
     azure: AzureEvalConfig = Field(default_factory=AzureEvalConfig)
     cost: CostConfig = Field(default_factory=CostConfig)
+    # Flakiness control: run each LLM evaluator N times and aggregate the score
+    # (median) so a single unlucky judge sample can't flip a pass/fail. 1 = off.
+    samples: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +225,34 @@ class DashboardConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Quality gates + notifications (CI)
+# ---------------------------------------------------------------------------
+
+
+class GatesConfig(BaseModel):
+    """Quality-gate thresholds enforced by ``attest run --gate`` (CI).
+
+    Any set threshold that is violated fails the run with a non-zero exit code.
+    Leave a field unset (None) to skip that check.
+    """
+
+    min_pass_rate: Optional[float] = None       # e.g. 0.95 → fail if < 95% pass
+    max_failed: Optional[int] = None            # fail if more than N tests fail
+    max_errors: Optional[int] = None            # fail if more than N tests error
+    max_p95_latency_ms: Optional[float] = None  # fail if run p95 latency exceeds this
+    max_total_cost: Optional[float] = None      # fail if run cost exceeds this (USD)
+    min_avg_score: Optional[float] = None       # fail if avg evaluator score below this
+
+
+class NotifyConfig(BaseModel):
+    """Optional notification on run completion (Slack/Teams/generic webhook)."""
+
+    webhook_url: Optional[str] = None           # POST target (Slack/Teams/custom)
+    on: str = "always"                          # always | failure | regression
+    style: str = "generic"                      # generic | slack | teams
+
+
+# ---------------------------------------------------------------------------
 # Project config
 # ---------------------------------------------------------------------------
 
@@ -251,3 +282,5 @@ class AttestConfig(BaseModel):
     tests: TestsConfig = Field(default_factory=TestsConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    gates: GatesConfig = Field(default_factory=GatesConfig)
+    notify: NotifyConfig = Field(default_factory=NotifyConfig)

@@ -610,7 +610,7 @@ class TestRunner:
         # Run each evaluator
         for evaluator in evaluators:
             try:
-                eval_result = await evaluator.evaluate(eval_input)
+                eval_result = await self._evaluate_with_samples(evaluator, eval_input)
                 scores.append(
                     EvalScore(
                         name=eval_result.name,
@@ -664,7 +664,7 @@ class TestRunner:
 
         for evaluator in evaluators:
             try:
-                eval_result = await evaluator.evaluate(eval_input)
+                eval_result = await self._evaluate_with_samples(evaluator, eval_input)
                 scores.append(
                     EvalScore(
                         name=eval_result.name,
@@ -685,6 +685,34 @@ class TestRunner:
                 )
 
         return scores
+
+    async def _evaluate_with_samples(self, evaluator, eval_input):
+        """Run an evaluator once, or N times and aggregate (median) if
+        ``evaluation.samples > 1`` — reduces LLM-judge flakiness so a single
+        unlucky sample can't flip a pass/fail decision.
+        """
+        samples = getattr(self._config.evaluation, "samples", 1) or 1
+        single = await evaluator.evaluate(eval_input)
+        if samples <= 1:
+            return single
+
+        results = [single]
+        for _ in range(samples - 1):
+            try:
+                results.append(await evaluator.evaluate(eval_input))
+            except Exception:
+                pass  # a failed sample is dropped; median of the rest still holds
+
+        vals = sorted(r.score for r in results)
+        n = len(vals)
+        median = vals[n // 2] if n % 2 == 1 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+        # Re-derive pass/fail from the aggregated score against the threshold.
+        base = single
+        base.score = round(median, 4)
+        base.passed = median >= base.threshold
+        base.reason = f"median of {n} samples: {round(median, 3)} (threshold {base.threshold}). {base.reason or ''}".strip()
+        base.metadata = {**(base.metadata or {}), "samples": n, "sample_scores": [round(v, 3) for v in vals]}
+        return base
 
     # ------------------------------------------------------------------
     # Status determination

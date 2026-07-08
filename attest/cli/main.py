@@ -214,6 +214,11 @@ def run(
         "--fail-on-regression",
         help="Exit non-zero if a test that passed in the previous run now fails (CI gate).",
     ),
+    gate: bool = typer.Option(
+        False,
+        "--gate",
+        help="Enforce quality gates from attest.yaml (min_pass_rate, max_p95_latency_ms, ...). Exit non-zero on violation.",
+    ),
     trace: bool = typer.Option(
         False,
         "--trace",
@@ -247,6 +252,7 @@ def run(
         parallel=parallel,
         profile=profile,
         fail_on_regression=fail_on_regression,
+        enforce_gates=gate,
     ))
 
 
@@ -280,6 +286,33 @@ def test_connection(
     from attest.cli.test_connection_cmd import run_test_connection
 
     asyncio.run(run_test_connection(config_path=config, agent_name=agent))
+
+
+# ---------------------------------------------------------------------------
+# attest doctor — diagnose configuration & environment
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def doctor(
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to attest.yaml. Auto-detected if not specified.",
+    ),
+):
+    """Diagnose your ATTEST setup — config, scenarios, evaluator backends, and agents.
+
+    A fast health check that surfaces misconfiguration before you run tests:
+      - Is attest.yaml valid and are agents configured?
+      - Are scenario files present and parseable?
+      - Which evaluator backends are installed / configured?
+      - Are credentials available for the LLM judge?
+
+    Examples:
+        attest doctor
+    """
+    from attest.cli.doctor_cmd import run_doctor
+
+    raise SystemExit(run_doctor(config_path=config))
 
 
 # ---------------------------------------------------------------------------

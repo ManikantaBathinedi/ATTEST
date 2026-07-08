@@ -18,6 +18,7 @@ from attest.adapters.autogen_adapter import AutoGenAgentAdapter
 from attest.adapters.openai_assistant_adapter import OpenAIAssistantAdapter
 from attest.adapters.mcp_adapter import MCPAgentAdapter
 from attest.adapters.mock_adapter import MockAgentAdapter
+from attest.adapters.a2a_adapter import A2AAgentAdapter
 from attest.core.config_models import AgentConfig
 from attest.core.exceptions import ConfigError
 
@@ -42,6 +43,12 @@ def create_adapter(config: AgentConfig) -> BaseAgentAdapter:
 
     if adapter_type in ("http", "rest", "http_rest"):
         return HttpAgentAdapter(config)
+
+    # A2A (Agent2Agent) protocol — JSON-RPC 2.0 over HTTP
+    if adapter_type == "a2a":
+        if not config.endpoint:
+            raise ConfigError("A2A agent requires 'endpoint' (the A2A server base URL)")
+        return A2AAgentAdapter(config)
 
     # Foundry Prompt Agent — uses Azure AI Projects SDK
     if adapter_type == "foundry_prompt":
@@ -99,7 +106,7 @@ def create_adapter(config: AgentConfig) -> BaseAgentAdapter:
 
     raise ConfigError(
         f"Unknown agent type: '{config.type}'. "
-        f"Supported types: mock, http, foundry_prompt, foundry_hosted, callable, mcp"
+        f"Supported types: mock, http, a2a, foundry_prompt, foundry_hosted, callable, mcp"
     )
 
 
@@ -115,5 +122,6 @@ __all__ = [
     "OpenAIAssistantAdapter",
     "MCPAgentAdapter",
     "MockAgentAdapter",
+    "A2AAgentAdapter",
     "create_adapter",
 ]

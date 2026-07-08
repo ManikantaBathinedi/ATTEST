@@ -268,6 +268,8 @@ Results are saved to `reports/results.json` automatically.
 | `attest run` | Run all tests |
 | `attest run --suite "name"` | Run one suite |
 | `attest run --tag smoke` | Run by tag |
+| `attest run --gate` | Enforce quality gates from attest.yaml (non-zero exit on violation) |
+| `attest doctor` | Diagnose config, scenarios, evaluator backends & credentials |
 | `attest examples` | List the bundled example test suites |
 | `attest examples --run` | Run the offline (mock-agent) examples |
 | `attest serve` | Start web dashboard |

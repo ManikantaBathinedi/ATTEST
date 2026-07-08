@@ -31,7 +31,7 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 ### 2. Agent Connections (Agent Setup)
 - List all configured agents with a type badge (Foundry / HTTP / MCP)
 - Add/Edit/Delete agents; Test Connection per agent (shows latency + response preview)
-- Agent types: Azure Foundry, HTTP/REST, MCP server, or "Other framework" (code-only adapters)
+- Agent types: Azure Foundry, HTTP/REST, **A2A (Agent2Agent)**, MCP server, or "Other framework" (code-only adapters)
 - HTTP agents include an optional **🔀 Multi-agent routing** section (`handled_by` /
   `routing_path` JSONPaths) for orchestrators
 - Saves to `attest.yaml`
@@ -72,7 +72,10 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 
 ### 8. Settings
 - API key management with show/hide toggle (Azure + OpenAI)
-- Execution & cost settings (caching, rate limit, max eval cost, Foundry upload)
+- Execution & cost settings (caching, rate limit, max eval cost, **evaluator samples** for flakiness control, Foundry upload)
+- **✅ Quality Gates** — set CI pass/fail thresholds (pass rate, failed/errors, p95 latency, cost, avg score); enforce with `attest run --gate`
+- **🔔 Notifications** — Slack / Teams / generic webhook on run completion, with a **Send Test** button
+- **🩺 Diagnostics** — in-dashboard `attest doctor`: checks config, agents, scenarios, evaluator backends & credentials
 - Current configuration display + evaluator backend status
 
 ### 9. Help & About

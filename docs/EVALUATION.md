@@ -89,6 +89,19 @@ evaluators:
   - deepeval_toxicity: { threshold: 0.9 } # Custom threshold
 ```
 
+## Reducing LLM-Judge Flakiness
+
+LLM-as-judge scores can vary run-to-run. To stop a single unlucky sample from flipping a
+pass/fail, run each evaluator N times and take the **median**:
+
+```yaml
+evaluation:
+  samples: 3        # run every evaluator 3× and aggregate (median). 1 = off (default)
+```
+
+This trades extra LLM cost for stability — pair it with a small N (3–5) on the tests that
+gate your CI. Also configurable in the dashboard under **Settings → Execution & Cost**.
+
 ## Plugin Architecture
 
 All evaluators implement `BaseEvaluator`:

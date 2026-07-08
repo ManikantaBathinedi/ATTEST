@@ -34,6 +34,7 @@ async def run_tests(
     profile: Optional[str] = None,
     return_results: bool = False,
     fail_on_regression: bool = False,
+    enforce_gates: bool = False,
 ) -> Optional[List[TestResult]]:
     """Execute all test scenarios.
 
@@ -142,6 +143,33 @@ async def run_tests(
                 console.print(f"  [red]- {name}[/red]")
             if not return_results:
                 raise SystemExit(2)
+
+    # Step 6b: Notifications (Slack/Teams/generic webhook)
+    try:
+        from attest.utils.notify import maybe_notify
+        maybe_notify(config.notify, summary, previous)
+    except Exception as e:  # never let notify break a run
+        if verbose:
+            console.print(f"  [dim]Notification skipped: {e}[/dim]")
+
+    # Step 6c: Quality gates — enforce configured thresholds (CI)
+    if enforce_gates:
+        from attest.core.gates import evaluate_gates, gates_are_configured
+        if not gates_are_configured(config.gates):
+            console.print(
+                "[yellow]--gate was set but no gates are configured in attest.yaml "
+                "(gates: min_pass_rate, max_p95_latency_ms, ...). Skipping.[/yellow]"
+            )
+        else:
+            passed, violations = evaluate_gates(summary, config.gates)
+            if passed:
+                console.print("\n[green]\u2705 Quality gates passed.[/green]")
+            else:
+                console.print(f"\n[red]\u274c Quality gate failed ({len(violations)} violation(s)):[/red]")
+                for v in violations:
+                    console.print(f"  [red]- {v}[/red]")
+                if not return_results:
+                    raise SystemExit(3)
 
     # Exit with non-zero if any tests failed
     if summary.failed > 0 or summary.errors > 0:

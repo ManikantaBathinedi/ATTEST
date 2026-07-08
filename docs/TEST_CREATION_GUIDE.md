@@ -452,11 +452,47 @@ tests:
 |--------|----------|----------|
 | **Dashboard form** | Quick one-off tests | Single turn, multi-turn, simulation |
 | **YAML files** | Version-controlled test suites | All types including scripted multi-turn |
+| **Data-driven (`dataset:`)** | Same checks across many inputs | One case per CSV/JSONL row with `{{column}}` templating |
 | **CSV upload** | Bulk single-turn + simulation | Single turn, simulation (not scripted multi-turn) |
 | **JSONL upload** | Bulk all types | All types including scripted multi-turn |
 | **Security generator** | One-click red team | 30 attack patterns |
 | **AI generator** | Describe agent → get tests | Single turn with assertions |
 | **Python code** | CI/CD integration, custom logic | All types |
+
+---
+
+## Data-Driven Tests (`dataset:`)
+
+Run the **same assertions and evaluators across many inputs** by pointing one test at a
+dataset file. ATTEST expands it into one test case per row, filling `{{column}}` placeholders
+from each row — in the input, expected output, assertions, and evaluators.
+
+```yaml
+name: "QA Accuracy"
+agent: my_agent
+tests:
+  - name: "qa_{{question}}"                 # {{column}} works in the name too
+    dataset:
+      path: "tests/data/qa_pairs.jsonl"     # relative to this file, then CWD
+    input: "{{question}}"
+    expected_output: "{{answer}}"
+    assertions:
+      - response_contains: "{{answer}}"
+    evaluators:
+      - correctness
+```
+
+With `tests/data/qa_pairs.jsonl`:
+```json
+{"question": "Capital of Japan?", "answer": "Tokyo"}
+{"question": "Capital of France?", "answer": "Paris"}
+```
+
+→ produces **two** test cases, each with its own input, expected output, and assertion.
+
+**Supported formats:** `.jsonl` / `.ndjson` (one object per line), `.json` (a list or `{rows: [...]}`),
+and `.csv` (header row = column names). If a row has a `name` column and the test name isn't
+templated, it's used as the case name; otherwise names fall back to `<file>#<n>`.
 
 ---
 

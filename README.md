@@ -4,6 +4,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/ManikantaBathinedi/ATTEST/actions/workflows/ci.yml"><img src="https://github.com/ManikantaBathinedi/ATTEST/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  &nbsp;<img src="https://img.shields.io/badge/python-3.9%20%E2%80%93%203.12-blue" alt="Python">
+  &nbsp;<img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  &nbsp;<img src="https://img.shields.io/badge/tests-passing-brightgreen" alt="Tests">
+</p>
+
+<p align="center">
   <a href="#quick-start">Quick Start</a> &nbsp;|&nbsp;
   <a href="docs/GETTING_STARTED.md">Full Setup Guide</a> &nbsp;|&nbsp;
   <a href="docs/TEST_CREATION_GUIDE.md">Test Types</a> &nbsp;|&nbsp;
@@ -46,8 +53,11 @@ Testing AI agents is hard. Responses are non-deterministic, tool calls are invis
 - **Multi-turn conversations** — test booking flows, multi-step tasks, context retention
 - **User simulation** — LLM plays realistic personas to find edge cases humans miss
 - **Security red teaming** — 30 attacks across 7 categories (prompt injection, jailbreak, PII extraction)
-- **Works with the frameworks you use** — LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP, Azure Foundry, HTTP/REST, or any Python callable
+- **Works with the frameworks you use** — LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP, A2A, Azure Foundry, HTTP/REST, or any Python callable
+- **Data-driven tests** — point one test at a CSV/JSONL dataset and it expands to one case per row with `{{column}}` templating
 - **Regression & trust over time** — golden baselines, run-vs-run comparison, CI regression gate
+- **Quality gates** — fail CI on pass-rate, p95 latency, cost, or score thresholds (`attest run --gate`)
+- **Notifications** — Slack / Teams / webhook on run completion
 - **Web dashboard** — visual UI to create, run, and analyze tests without touching the CLI
 - **CI/CD ready** — JUnit XML, Markdown/PR reports, GitHub Actions & Azure DevOps templates, exit codes
 
@@ -70,7 +80,7 @@ CI-ready package.
 | Security red-teaming (built-in attacks) | ✅ 30 | ❌ | ⚠️ | ⚠️ | ❌ |
 | Golden baselines + regression gate | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
 | Tool-call & multi-agent routing assertions | ✅ | ⚠️ | ⚠️ | ❌ | ❌ |
-| Framework adapters (LangChain/LangGraph/CrewAI/AutoGen/OpenAI Assistants/MCP/Foundry/HTTP) | ✅ 8 | ⚠️ LC only | ⚠️ | ✅ | ❌ |
+| Framework adapters (Foundry/HTTP/A2A/MCP/LangChain/LangGraph/CrewAI/AutoGen/OpenAI Assistants) | ✅ 9 | ⚠️ LC only | ⚠️ | ✅ | ❌ |
 | Web dashboard (no-code) | ✅ | ✅ | ❌ | ⚠️ | ❌ |
 | CI templates + PR/Markdown reports | ✅ | ⚠️ | ⚠️ | ✅ | ❌ |
 | Self-hostable / no vendor lock-in | ✅ | ❌ | ✅ | ✅ | ✅ |
@@ -307,17 +317,18 @@ asyncio.run(main())
 
 ```
 attest/
-├── adapters/           # Agent connectors (Mock, Foundry, HTTP, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP)
-├── cli/                # CLI commands (init, run, serve, examples, ci, test-connection)
-├── core/               # Config, models, runner, assertions, scenario loader
+├── adapters/           # Agent connectors (Mock, Foundry, HTTP, A2A, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, MCP)
+├── cli/                # CLI commands (init, run, serve, examples, ci, doctor, test-connection)
+├── core/               # Config, models, runner, assertions, pricing, gates, scenario loader
 ├── conversation/       # Multi-turn conversation engine
 ├── dashboard/          # Web UI — FastAPI backend + single HTML frontend
 ├── evaluation/         # Evaluator framework + 5 built-in evaluators
+├── perf/               # Agent performance stats (latency/TTFT/throughput percentiles)
 ├── plugins/
 │   ├── deepeval_plugin/  # 12 DeepEval evaluators
 │   ├── azure_eval/       # 15 Azure AI SDK evaluators
 │   └── ragas_plugin/     # 4 RAGAS RAG evaluators
-├── reporting/          # HTML, JUnit XML, CSV report generators
+├── reporting/          # HTML, JUnit XML, CSV, Markdown report generators
 ├── security/           # Red team attack generator (30 patterns)
 └── simulation/         # User simulation (LLM-driven personas)
 ```

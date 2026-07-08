@@ -123,6 +123,21 @@ def _parse_scenario_data(data: Dict[str, Any], source_file: str = "") -> List[Te
     # Mode 1: Inline tests
     if "tests" in data:
         for test_data in data["tests"]:
+            # Data-driven: a test with a `dataset:` reference is expanded into
+            # one TestCase per row, with {{column}} placeholders filled in.
+            if "dataset" in test_data:
+                test_cases.extend(
+                    _expand_dataset_test(
+                        test_data,
+                        suite_name=suite_name,
+                        default_agent=default_agent,
+                        suite_evaluators=suite_evaluators,
+                        suite_assertions=suite_assertions,
+                        suite_tags=suite_tags,
+                        source_file=source_file,
+                    )
+                )
+                continue
             tc = _parse_single_test(
                 test_data,
                 suite_name=suite_name,
@@ -146,6 +161,102 @@ def _parse_scenario_data(data: Dict[str, Any], source_file: str = "") -> List[Te
         test_cases.extend(data_tests)
 
     return test_cases
+
+
+def _read_dataset_rows(path: Path) -> List[Dict[str, Any]]:
+    """Read rows from a .jsonl or .csv dataset file into a list of dicts."""
+    rows: List[Dict[str, Any]] = []
+    suffix = path.suffix.lower()
+    if suffix in (".jsonl", ".ndjson"):
+        with open(path, "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    raise ScenarioError(f"Invalid JSON on line {line_num} of {path}: {e}")
+    elif suffix == ".json":
+        with open(path, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        if isinstance(loaded, list):
+            rows = [r for r in loaded if isinstance(r, dict)]
+        elif isinstance(loaded, dict) and isinstance(loaded.get("rows"), list):
+            rows = [r for r in loaded["rows"] if isinstance(r, dict)]
+    elif suffix == ".csv":
+        import csv
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            rows = [dict(r) for r in csv.DictReader(f)]
+    else:
+        raise ScenarioError(f"Unsupported dataset format '{suffix}' for {path} (use .jsonl, .json, or .csv).")
+    return rows
+
+
+def _fill_template(value: Any, row: Dict[str, Any]) -> Any:
+    """Recursively replace {{column}} placeholders in strings using row values."""
+    if isinstance(value, str):
+        out = value
+        for col, val in row.items():
+            out = out.replace("{{" + str(col) + "}}", str(val))
+        return out
+    if isinstance(value, list):
+        return [_fill_template(v, row) for v in value]
+    if isinstance(value, dict):
+        return {k: _fill_template(v, row) for k, v in value.items()}
+    return value
+
+
+def _expand_dataset_test(
+    test_data: Dict[str, Any],
+    suite_name: str,
+    default_agent: str,
+    suite_evaluators: list,
+    suite_assertions: list,
+    suite_tags: list,
+    source_file: str = "",
+) -> List[TestCase]:
+    """Expand one ``dataset:``-driven test definition into N TestCases.
+
+    The test's fields (input, assertions, expected_output, ...) may contain
+    ``{{column}}`` placeholders filled from each dataset row. The dataset path
+    is resolved relative to the scenario file, then the current directory.
+    """
+    dataset_ref = test_data["dataset"]
+    rel_path = dataset_ref.get("path") if isinstance(dataset_ref, dict) else dataset_ref
+    if not rel_path:
+        raise ScenarioError(f"Test '{test_data.get('name', 'unnamed')}' has a 'dataset' with no 'path'.")
+
+    # Resolve relative to the scenario file first, then CWD.
+    candidates = []
+    if source_file:
+        candidates.append(Path(source_file).parent / rel_path)
+    candidates.append(Path(rel_path))
+    path = next((c for c in candidates if c.exists()), None)
+    if path is None:
+        raise ScenarioError(f"Dataset file not found: {rel_path} (referenced in '{test_data.get('name', 'unnamed')}').")
+
+    rows = _read_dataset_rows(path)
+    base_name = test_data.get("name", path.stem)
+
+    cases: List[TestCase] = []
+    for i, row in enumerate(rows, 1):
+        # Fill placeholders across a copy of the test definition.
+        filled = {k: _fill_template(v, row) for k, v in test_data.items() if k != "dataset"}
+        # Name: explicit template, else base_name#i (prefer a row 'name' column).
+        if "name" not in filled or "{{" in str(test_data.get("name", "")):
+            filled["name"] = row.get("name", f"{base_name}#{i}")
+        cases.append(
+            _parse_single_test(
+                filled,
+                suite_name=suite_name,
+                default_agent=default_agent,
+                suite_evaluators=suite_evaluators,
+                suite_assertions=suite_assertions,
+                suite_tags=suite_tags,
+            )
+        )
+    return cases
 
 
 def _parse_single_test(

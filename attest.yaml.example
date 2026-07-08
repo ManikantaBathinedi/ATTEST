@@ -79,6 +79,21 @@ agents:
   #     Authorization: "Bearer ${MY_API_KEY}"  # Reference from .env
 
   # ----------------------------------------------------------
+  # A2A (Agent2Agent Protocol) Agent (uncomment to use)
+  # ----------------------------------------------------------
+  # Connects via JSON-RPC 2.0 message/send. Reads the agent card at
+  # /.well-known/agent.json for capabilities when available.
+  #
+  # my_a2a_agent:
+  #   type: a2a
+  #   endpoint: "https://your-agent.example.com"   # A2A server base URL
+  #   request:
+  #     path: "/"                                  # JSON-RPC endpoint path (default "/")
+  #   auth:
+  #     type: bearer
+  #     token: "${A2A_TOKEN}"
+
+  # ----------------------------------------------------------
   # Second Foundry Agent (for A/B comparison)
   # ----------------------------------------------------------
   # Configure multiple agents, run same tests against both,
@@ -121,6 +136,9 @@ evaluation:
     max_eval_cost_per_run: 5.00                        # Stop if evaluation costs exceed $5
     cache_responses: true                               # Cache results to save money on reruns
 
+  # samples: 3   # Run each LLM evaluator N times and take the median score,
+                 # so a single unlucky judge sample can't flip pass/fail. 1 = off.
+
 
 # ============================================================
 # TEST DISCOVERY â€” Where to find test scenarios
@@ -152,3 +170,28 @@ reporting:
 # dashboard:
 #   port: 8080
 #   auto_open: true
+
+# ============================================================
+# QUALITY GATES (optional) — CI pass/fail policy
+# ============================================================
+# Enforce with: attest run --gate   (exits non-zero on any violation)
+# Only the thresholds you set are checked.
+
+# gates:
+#   min_pass_rate: 0.95          # fail if < 95% of tests pass
+#   max_failed: 0                # fail if more than N tests fail
+#   max_errors: 0                # fail if more than N tests error
+#   max_p95_latency_ms: 3000     # fail if run p95 latency exceeds this
+#   max_total_cost: 0.50         # fail if run cost exceeds this (USD)
+#   min_avg_score: 0.80          # fail if average evaluator score is below this
+
+
+# ============================================================
+# NOTIFICATIONS (optional) — Slack / Teams / generic webhook
+# ============================================================
+# Fired once when a run completes.
+
+# notify:
+#   webhook_url: "${SLACK_WEBHOOK_URL}"   # POST target
+#   on: failure                            # always | failure | regression
+#   style: slack                           # slack | teams | generic

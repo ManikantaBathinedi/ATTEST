@@ -150,6 +150,12 @@ async def save_agent(req: AgentSetupRequest):
         else:
             mcp_cfg["endpoint"] = req.endpoint
         data["agents"][req.name] = mcp_cfg
+    elif req.type == "a2a":
+        # A2A (Agent2Agent) — JSON-RPC 2.0 over HTTP.
+        a2a_cfg = {"type": "a2a", "endpoint": req.endpoint}
+        if req.request_path and req.request_path not in ("/chat", "/"):
+            a2a_cfg["request"] = {"path": req.request_path}
+        data["agents"][req.name] = a2a_cfg
     else:
         response_cfg = {"content_path": req.response_path}
         # Multi-agent orchestrator routing fields (only written when provided).
@@ -1337,21 +1343,10 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
         json_path = output_dir / "results.json"
         if (suite_filter or test_name_filter or tag_filter or agent_override) and json_path.exists():
             try:
+                from attest.utils.results_merge import merge_results
                 existing = json.loads(json_path.read_text(encoding="utf-8"))
-                # Key by scenario+agent so same test with different agents coexist
-                def result_key(r):
-                    return r["scenario"] + "|" + r.get("agent", "default")
-                existing_results = {result_key(r): r for r in existing.get("results", [])}
-                # Update/add new results
-                for r in json.loads(new_summary.model_dump_json()).get("results", []):
-                    existing_results[result_key(r)] = r
-                # Rebuild summary
-                all_results = list(existing_results.values())
-                existing["results"] = all_results
-                existing["total"] = len(all_results)
-                existing["passed"] = sum(1 for r in all_results if r["status"] == "passed")
-                existing["failed"] = sum(1 for r in all_results if r["status"] == "failed")
-                existing["errors"] = sum(1 for r in all_results if r["status"] == "error")
+                new_rows = json.loads(new_summary.model_dump_json()).get("results", [])
+                existing = merge_results(existing, new_rows)
                 existing["timestamp"] = new_summary.timestamp.isoformat()
                 json_path.write_text(json.dumps(existing, indent=2, default=str), encoding="utf-8")
             except Exception:
@@ -2097,6 +2092,7 @@ async def get_execution_config():
             "cache_responses": config.evaluation.cost.cache_responses,
             "rate_limit": config.evaluation.cost.rate_limit,
             "max_eval_cost_per_run": config.evaluation.cost.max_eval_cost_per_run,
+            "eval_samples": getattr(config.evaluation, "samples", 1),
             "foundry_upload": config.reporting.foundry_upload,
             "profiles": profiles,
         }
@@ -2215,22 +2211,10 @@ async def _execute_tests_advanced(
         # file (keyed by scenario|agent), preserving everything else.
         if _cancel_requested and json_path.exists():
             try:
+                from attest.utils.results_merge import merge_results
                 existing = json.loads(json_path.read_text(encoding="utf-8"))
-
-                def _result_key(r):
-                    return r["scenario"] + "|" + r.get("agent", "default")
-
-                merged = {_result_key(r): r for r in existing.get("results", [])}
-                for r in json.loads(summary.model_dump_json()).get("results", []):
-                    merged[_result_key(r)] = r
-
-                results_list = list(merged.values())
-                existing["results"] = results_list
-                existing["total"] = len(results_list)
-                existing["passed"] = sum(1 for r in results_list if r.get("status") == "passed")
-                existing["failed"] = sum(1 for r in results_list if r.get("status") == "failed")
-                existing["errors"] = sum(1 for r in results_list if r.get("status") == "error")
-                existing["skipped"] = sum(1 for r in results_list if r.get("status") == "skipped")
+                new_rows = json.loads(summary.model_dump_json()).get("results", [])
+                existing = merge_results(existing, new_rows)
                 json_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
             except Exception:
                 # If merge fails, fall back to leaving results.json untouched.
@@ -2310,6 +2294,8 @@ async def save_execution_settings(data: dict):
         raw["evaluation"]["cost"]["rate_limit"] = float(data["rate_limit"])
     if "max_eval_cost_per_run" in data:
         raw["evaluation"]["cost"]["max_eval_cost_per_run"] = float(data["max_eval_cost_per_run"])
+    if "eval_samples" in data:
+        raw["evaluation"]["samples"] = max(1, int(data["eval_samples"]))
     if "foundry_upload" in data:
         raw["reporting"]["foundry_upload"] = bool(data["foundry_upload"])
 
@@ -2317,3 +2303,200 @@ async def save_execution_settings(data: dict):
         yaml.dump(raw, f)
 
     return {"message": "Execution settings saved"}
+
+
+# ---------------------------------------------------------------------------
+# Quality gates (CI policy)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/settings/gates")
+async def get_gates():
+    """Return the configured quality-gate thresholds."""
+    try:
+        config = load_config(_config_path)
+        g = config.gates
+        return {
+            "min_pass_rate": g.min_pass_rate,
+            "max_failed": g.max_failed,
+            "max_errors": g.max_errors,
+            "max_p95_latency_ms": g.max_p95_latency_ms,
+            "max_total_cost": g.max_total_cost,
+            "min_avg_score": g.min_avg_score,
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/settings/gates")
+async def save_gates(data: dict):
+    """Save quality-gate thresholds to attest.yaml. Null/blank clears a gate."""
+    from ruamel.yaml import YAML
+    config_path = _get_config_path()
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    raw = {}
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = yaml.load(f) or {}
+
+    gates = {}
+    for key, cast in (
+        ("min_pass_rate", float), ("max_failed", int), ("max_errors", int),
+        ("max_p95_latency_ms", float), ("max_total_cost", float), ("min_avg_score", float),
+    ):
+        val = data.get(key)
+        if val is not None and val != "":
+            try:
+                gates[key] = cast(val)
+            except (ValueError, TypeError):
+                pass
+    if gates:
+        raw["gates"] = gates
+    elif "gates" in raw:
+        del raw["gates"]  # all cleared
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(raw, f)
+    return {"message": "Quality gates saved", "gates": gates}
+
+
+# ---------------------------------------------------------------------------
+# Notifications (webhook)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/settings/notify")
+async def get_notify():
+    """Return the configured notification settings."""
+    try:
+        config = load_config(_config_path)
+        n = config.notify
+        return {"webhook_url": n.webhook_url or "", "on": n.on, "style": n.style}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/settings/notify")
+async def save_notify(data: dict):
+    """Save notification settings to attest.yaml."""
+    from ruamel.yaml import YAML
+    config_path = _get_config_path()
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    raw = {}
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = yaml.load(f) or {}
+
+    url = (data.get("webhook_url") or "").strip()
+    if url:
+        raw["notify"] = {
+            "webhook_url": url,
+            "on": data.get("on", "always"),
+            "style": data.get("style", "generic"),
+        }
+    elif "notify" in raw:
+        del raw["notify"]
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(raw, f)
+    return {"message": "Notification settings saved"}
+
+
+@app.post("/api/settings/notify/test")
+async def test_notify(data: dict):
+    """Send a test notification to the given webhook."""
+    url = (data.get("webhook_url") or "").strip()
+    if not url:
+        return JSONResponse({"error": "No webhook URL provided."}, status_code=400)
+    style = data.get("style", "generic")
+    from attest.utils.notify import _payload
+    payload = _payload(style, "✅ ATTEST test notification — your webhook is working.")
+    try:
+        import httpx
+        r = httpx.post(url, json=payload, timeout=10)
+        return {"ok": r.status_code < 400, "status": r.status_code}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+
+# ---------------------------------------------------------------------------
+# Doctor (diagnostics)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/doctor")
+async def doctor_diagnostics():
+    """Return a structured health check of the ATTEST setup (for the dashboard)."""
+    checks = []
+
+    def add(name, status, detail=""):
+        checks.append({"name": name, "status": status, "detail": detail})
+
+    # Config
+    config = None
+    try:
+        config = load_config(_config_path)
+        add("Configuration", "ok", "attest.yaml loaded")
+    except Exception as e:
+        add("Configuration", "error", str(e))
+
+    # Agents
+    if config is not None:
+        if config.agents:
+            add("Agents", "ok", f"{len(config.agents)} configured: {', '.join(config.agents)}")
+        else:
+            add("Agents", "warn", "no agents configured")
+
+    # Scenarios
+    if config is not None:
+        try:
+            from attest.core.scenario_loader import load_scenarios
+            cases = load_scenarios(directory=config.tests.scenarios_dir)
+            if cases:
+                add("Test scenarios", "ok", f"{len(cases)} test(s) found")
+                unknown = {c.agent for c in cases} - set(config.agents) - {"default"}
+                if unknown:
+                    add("Scenario agents", "warn", f"tests reference unconfigured agent(s): {', '.join(sorted(unknown))}")
+            else:
+                add("Test scenarios", "warn", "no scenarios found")
+        except Exception as e:
+            add("Test scenarios", "error", str(e))
+
+    # Evaluator backends
+    for label, module, install in (
+        ("DeepEval", "deepeval", "pip install deepeval"),
+        ("Azure AI Evaluation", "azure.ai.evaluation", "pip install azure-ai-evaluation"),
+        ("RAGAS", "ragas", "pip install ragas langchain-openai"),
+    ):
+        try:
+            __import__(module)
+            add(f"{label} backend", "ok", "installed")
+        except Exception:
+            add(f"{label} backend", "warn", f"not installed ({install})")
+
+    # Judge credentials
+    has_openai = bool(os.environ.get("OPENAI_API_KEY"))
+    has_azure = bool(os.environ.get("AZURE_API_KEY_OPENAI") or os.environ.get("AZURE_API_KEY"))
+    has_base = bool(os.environ.get("AZURE_API_BASE"))
+    if has_openai or (has_azure and has_base):
+        add("LLM judge credentials", "ok", "configured")
+    elif has_base:
+        add("LLM judge credentials", "warn", "endpoint set but no key — will try keyless (az login)")
+    else:
+        add("LLM judge credentials", "warn", "no credentials — evaluators will error")
+
+    # Gates
+    if config is not None:
+        from attest.core.gates import gates_are_configured
+        if gates_are_configured(config.gates):
+            add("Quality gates", "ok", "configured")
+        else:
+            add("Quality gates", "info", "not set (optional)")
+
+    problems = sum(1 for c in checks if c["status"] == "error")
+    warnings = sum(1 for c in checks if c["status"] == "warn")
+    healthy = problems == 0
+    return {"healthy": healthy, "problems": problems, "warnings": warnings, "checks": checks}
+

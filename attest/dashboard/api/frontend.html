@@ -230,6 +230,7 @@
             <div class="form-group"><label>Agent Type</label><select id="s-type" onchange="toggleAgentFields()">
                 <option value="foundry_prompt">Azure Foundry Prompt Agent</option>
                 <option value="http">HTTP / REST API</option>
+                <option value="a2a">A2A (Agent2Agent Protocol)</option>
                 <option value="mcp">MCP Server (Model Context Protocol)</option>
                 <option value="__codeonly__">Other framework (LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants)…</option>
             </select></div>
@@ -256,10 +257,14 @@
                 </div>
             </details>
         </div>
+        <div id="a2aFields" style="display:none">
+            <div class="form-group"><label>A2A Server Endpoint</label><input id="s-a2a-endpoint" placeholder="https://your-agent.example.com"></div>
+            <div class="form-group"><label>JSON-RPC Path <span style="color:#64748b;font-size:11px">(usually "/")</span></label><input id="s-a2a-path" value="/" placeholder="/"></div>
+            <div style="font-size:12px;color:#9aa7bd;margin-top:6px;line-height:1.5">Connects via the <strong>A2A (Agent2Agent)</strong> protocol — JSON-RPC 2.0 <code>message/send</code>. ATTEST reads capabilities from the agent card at <code>/.well-known/agent.json</code> when available.</div>
+        </div>
         <div id="mcpFields" style="display:none">
             <div class="form-row">
-                <div class="form-group"><label>Transport</label><select id="s-mcp-transport" onchange="toggleMcpTransport()">
-                    <option value="stdio">stdio (launch a local server)</option>
+                <div class="form-group"><label>Transport</label><select id="s-mcp-transport" onchange="toggleMcpTransport()">                    <option value="stdio">stdio (launch a local server)</option>
                     <option value="sse">sse (connect to a running server)</option>
                 </select></div>
                 <div class="form-group"><label>Default Tool <span style="color:#64748b;font-size:11px">(tool to call)</span></label><input id="s-mcp-tool" placeholder="search"></div>
@@ -1038,9 +1043,61 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
                     <option value="true">Enabled — upload results to Foundry</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>Evaluator Samples <span style="color:#64748b;font-size:11px">(run each N×, take median — reduces flakiness)</span></label>
+                <input id="set-eval-samples" type="number" value="1" min="1" max="9" step="1" style="margin:0">
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveExecutionSettings()" style="margin-top:8px">💾 Save Execution Settings</button>
         <div id="execSettingsAlert" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Quality Gates -->
+    <div class="section">
+        <h2>✅ Quality Gates <span style="font-size:12px;color:#64748b;font-weight:400">(CI pass/fail policy)</span></h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Fail a run when a threshold is violated. Enforce in CI with <code>attest run --gate</code>. Leave a field blank to skip that check.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+            <div class="form-group"><label>Min Pass Rate <span style="color:#64748b;font-size:11px">(0–1)</span></label><input id="gate-pass-rate" type="number" min="0" max="1" step="0.05" placeholder="0.95" style="margin:0"></div>
+            <div class="form-group"><label>Max Failed</label><input id="gate-max-failed" type="number" min="0" step="1" placeholder="0" style="margin:0"></div>
+            <div class="form-group"><label>Max Errors</label><input id="gate-max-errors" type="number" min="0" step="1" placeholder="0" style="margin:0"></div>
+            <div class="form-group"><label>Max p95 Latency <span style="color:#64748b;font-size:11px">(ms)</span></label><input id="gate-p95" type="number" min="0" step="100" placeholder="3000" style="margin:0"></div>
+            <div class="form-group"><label>Max Total Cost <span style="color:#64748b;font-size:11px">(USD)</span></label><input id="gate-cost" type="number" min="0" step="0.05" placeholder="0.50" style="margin:0"></div>
+            <div class="form-group"><label>Min Avg Score <span style="color:#64748b;font-size:11px">(0–1)</span></label><input id="gate-avg-score" type="number" min="0" max="1" step="0.05" placeholder="0.80" style="margin:0"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveGates()" style="margin-top:8px">💾 Save Quality Gates</button>
+        <div id="gatesAlert" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="section">
+        <h2>🔔 Notifications <span style="font-size:12px;color:#64748b;font-weight:400">(Slack / Teams / webhook)</span></h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">POST a summary to a webhook when a run finishes.</div>
+        <div class="form-group"><label>Webhook URL <span style="color:#64748b;font-size:11px">(blank = disabled)</span></label><input id="notify-url" placeholder="https://hooks.slack.com/services/..." style="margin:0"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
+            <div class="form-group"><label>Send When</label><select id="notify-on" style="margin:0">
+                <option value="always">Always</option>
+                <option value="failure">On failure only</option>
+                <option value="regression">On regression only</option>
+            </select></div>
+            <div class="form-group"><label>Format</label><select id="notify-style" style="margin:0">
+                <option value="generic">Generic ({"text": ...})</option>
+                <option value="slack">Slack</option>
+                <option value="teams">Microsoft Teams</option>
+            </select></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="saveNotify()">💾 Save</button>
+            <button class="btn btn-outline" onclick="testNotify()">📤 Send Test</button>
+        </div>
+        <div id="notifyAlert" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Diagnostics (doctor) -->
+    <div class="section">
+        <h2>🩺 Diagnostics <span style="font-size:12px;color:#64748b;font-weight:400">(attest doctor)</span></h2>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Check config, agents, scenarios, evaluator backends, and credentials.</div>
+        <button class="btn btn-primary" onclick="runDoctor()">🩺 Run Diagnostics</button>
+        <div id="doctorResults" style="margin-top:12px"></div>
     </div>
 
     <div class="section">
@@ -1120,7 +1177,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px">
             <div class="gs-step" style="cursor:default">
                 <div style="font-size:22px">🔌</div>
-                <div><div class="gs-title">9 agent adapters</div><div class="gs-desc">HTTP, Callable, Foundry, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants &amp; MCP — plus an offline <code>mock</code> adapter that powers the bundled demo.</div></div>
+                <div><div class="gs-title">10 agent adapters</div><div class="gs-desc">HTTP, Callable, Foundry, A2A, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants &amp; MCP — plus an offline <code>mock</code> adapter that powers the bundled demo.</div></div>
             </div>
             <div class="gs-step" style="cursor:default">
                 <div style="font-size:22px">✅</div>
@@ -1191,7 +1248,7 @@ function showPage(name) {
     if (name==='tests') { loadTestCases(); checkEvaluatorStatus(); }
     if (name==='run') loadSuites();
     if (name==='suites') loadSuitesPage();
-    if (name==='settings') { loadConfigDisplay(); loadExecutionConfig(); loadDemoStatus(); }
+    if (name==='settings') { loadConfigDisplay(); loadExecutionConfig(); loadDemoStatus(); loadGates(); loadNotify(); }
     if (name==='setup') loadAgentSetup();
     if (name==='baselines') loadBaselineList();
 }
@@ -1218,6 +1275,10 @@ async function loadAgentSetup() {
             el.innerHTML = agents.map(a => {
                 const typeBadge = a.type === 'foundry_prompt'
                     ? '<span style="background:#3b82f620;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Foundry</span>'
+                    : a.type === 'a2a'
+                    ? '<span style="background:#a78bfa20;color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:11px">A2A</span>'
+                    : a.type === 'mcp'
+                    ? '<span style="background:#f9731620;color:#f97316;padding:2px 8px;border-radius:4px;font-size:11px">MCP</span>'
                     : '<span style="background:#22c55e20;color:#22c55e;padding:2px 8px;border-radius:4px;font-size:11px">HTTP</span>';
                 const endpoint = a.endpoint ? (a.endpoint.length > 60 ? a.endpoint.substring(0,60)+'...' : a.endpoint) : '—';
                 const detail = a.type === 'foundry_prompt'
@@ -1269,6 +1330,9 @@ async function editAgent(name) {
             document.getElementById('s-endpoint').value = agent.endpoint || '';
             document.getElementById('s-agent-name').value = agent.agent_name || '';
             document.getElementById('s-agent-version').value = agent.agent_version || '';
+        } else if (agent.type === 'a2a') {
+            document.getElementById('s-a2a-endpoint').value = agent.endpoint || '';
+            document.getElementById('s-a2a-path').value = agent.request_path || '/';
         } else {
             document.getElementById('s-http-endpoint').value = agent.endpoint || '';
             document.getElementById('s-http-path').value = agent.request_path || '/chat';
@@ -1352,6 +1416,7 @@ function toggleAgentFields() {
     const type = document.getElementById('s-type').value;
     document.getElementById('foundryFields').style.display = type==='foundry_prompt' ? 'block' : 'none';
     document.getElementById('httpFields').style.display = type==='http' ? 'block' : 'none';
+    const a2a = document.getElementById('a2aFields'); if (a2a) a2a.style.display = type==='a2a' ? 'block' : 'none';
     const mcp = document.getElementById('mcpFields'); if (mcp) mcp.style.display = type==='mcp' ? 'block' : 'none';
     const co = document.getElementById('codeOnlyFields'); if (co) co.style.display = type==='__codeonly__' ? 'block' : 'none';
     // Hide Save/Test for code-only frameworks (configured in Python, not the UI)
@@ -1379,6 +1444,9 @@ async function testConnection() {
         body.endpoint = document.getElementById('s-endpoint').value;
         body.agent_name = document.getElementById('s-agent-name').value;
         body.agent_version = document.getElementById('s-agent-version').value;
+    } else if (type==='a2a') {
+        body.endpoint = document.getElementById('s-a2a-endpoint').value;
+        body.request_path = document.getElementById('s-a2a-path').value || '/';
     } else {
         body.endpoint = document.getElementById('s-http-endpoint').value;
         body.request_path = document.getElementById('s-http-path').value;
@@ -1416,6 +1484,9 @@ async function saveAgent() {
         } else {
             body.endpoint = document.getElementById('s-mcp-url').value.trim();
         }
+    } else if (type==='a2a') {
+        body.endpoint = document.getElementById('s-a2a-endpoint').value.trim();
+        body.request_path = (document.getElementById('s-a2a-path').value || '/').trim();
     } else {
         body.endpoint = document.getElementById('s-http-endpoint').value;
         body.request_path = document.getElementById('s-http-path').value;
@@ -3186,6 +3257,8 @@ async function loadExecutionConfig() {
         document.getElementById('set-rate-limit').value = data.rate_limit || 0;
         document.getElementById('set-max-cost').value = data.max_eval_cost_per_run || 5;
         document.getElementById('set-foundry-upload').value = String(data.foundry_upload);
+        const samplesEl = document.getElementById('set-eval-samples');
+        if (samplesEl) samplesEl.value = data.eval_samples || 1;
 
         // Populate profiles in Run page dropdown
         const profileSelect = document.getElementById('runProfile');
@@ -3204,12 +3277,102 @@ async function saveExecutionSettings() {
         rate_limit: parseFloat(document.getElementById('set-rate-limit').value) || 0,
         max_eval_cost_per_run: parseFloat(document.getElementById('set-max-cost').value) || 5,
         foundry_upload: document.getElementById('set-foundry-upload').value === 'true',
+        eval_samples: parseInt(document.getElementById('set-eval-samples').value) || 1,
     };
     try {
         const res = await fetch('/api/settings/execution', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
         const data = await res.json();
         el.innerHTML = `<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ ${data.message}</div>`;
         setTimeout(() => el.innerHTML = '', 3000);
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+// ===== Quality Gates =====
+async function loadGates() {
+    try {
+        const d = await (await fetch('/api/settings/gates')).json();
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
+        set('gate-pass-rate', d.min_pass_rate);
+        set('gate-max-failed', d.max_failed);
+        set('gate-max-errors', d.max_errors);
+        set('gate-p95', d.max_p95_latency_ms);
+        set('gate-cost', d.max_total_cost);
+        set('gate-avg-score', d.min_avg_score);
+    } catch(e) {}
+}
+
+async function saveGates() {
+    const el = document.getElementById('gatesAlert');
+    const num = id => { const v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); };
+    const body = {
+        min_pass_rate: num('gate-pass-rate'), max_failed: num('gate-max-failed'),
+        max_errors: num('gate-max-errors'), max_p95_latency_ms: num('gate-p95'),
+        max_total_cost: num('gate-cost'), min_avg_score: num('gate-avg-score'),
+    };
+    try {
+        const res = await fetch('/api/settings/gates', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        el.innerHTML = `<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ ${data.message}. Enforce in CI with <code>attest run --gate</code>.</div>`;
+        setTimeout(() => el.innerHTML = '', 4000);
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+// ===== Notifications =====
+async function loadNotify() {
+    try {
+        const d = await (await fetch('/api/settings/notify')).json();
+        document.getElementById('notify-url').value = d.webhook_url || '';
+        document.getElementById('notify-on').value = d.on || 'always';
+        document.getElementById('notify-style').value = d.style || 'generic';
+    } catch(e) {}
+}
+
+async function saveNotify() {
+    const el = document.getElementById('notifyAlert');
+    const body = {
+        webhook_url: document.getElementById('notify-url').value.trim(),
+        on: document.getElementById('notify-on').value,
+        style: document.getElementById('notify-style').value,
+    };
+    try {
+        const res = await fetch('/api/settings/notify', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        el.innerHTML = `<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ ${data.message}</div>`;
+        setTimeout(() => el.innerHTML = '', 3000);
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+async function testNotify() {
+    const el = document.getElementById('notifyAlert');
+    const url = document.getElementById('notify-url').value.trim();
+    if (!url) { el.innerHTML = '<div style="color:#eab308">Enter a webhook URL first.</div>'; return; }
+    el.innerHTML = '<span class="spinner"></span> Sending test…';
+    try {
+        const res = await fetch('/api/settings/notify/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({webhook_url:url, style:document.getElementById('notify-style').value})});
+        const data = await res.json();
+        if (data.ok) el.innerHTML = '<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ Test sent (HTTP '+data.status+'). Check your channel.</div>';
+        else el.innerHTML = `<div style="color:#ef4444">❌ Failed: ${data.error || ('HTTP '+data.status)}</div>`;
+    } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+// ===== Diagnostics (doctor) =====
+async function runDoctor() {
+    const el = document.getElementById('doctorResults');
+    el.innerHTML = '<span class="spinner"></span> Running diagnostics…';
+    try {
+        const d = await (await fetch('/api/doctor')).json();
+        const icon = s => s==='ok' ? '✅' : s==='warn' ? '⚠️' : s==='error' ? '❌' : 'ℹ️';
+        const color = s => s==='ok' ? '#22c55e' : s==='warn' ? '#eab308' : s==='error' ? '#ef4444' : '#64748b';
+        const head = d.healthy
+            ? (d.warnings ? `<div style="color:#eab308;margin-bottom:10px">⚠️ Usable — ${d.warnings} warning(s) to review.</div>`
+                          : '<div style="color:#22c55e;margin-bottom:10px">✅ Everything looks healthy!</div>')
+            : `<div style="color:#ef4444;margin-bottom:10px">❌ ${d.problems} problem(s), ${d.warnings} warning(s).</div>`;
+        el.innerHTML = head + (d.checks||[]).map(c =>
+            `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #1e293b">
+                <span>${icon(c.status)}</span>
+                <span style="font-weight:600;min-width:200px;color:${color(c.status)}">${c.name}</span>
+                <span style="color:#94a3b8;font-size:13px">${c.detail||''}</span>
+            </div>`).join('');
     } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
 }
 
