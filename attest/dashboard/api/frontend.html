@@ -113,6 +113,11 @@
         .section-card-body { padding:9px 15px 13px; border-top:1px solid var(--border-soft); }
         .bl-card.open .bl-body { display:block !important; }
         .bl-card.open .bl-chevron { transform:rotate(180deg); display:inline-block; }
+        .settings-jump { position:sticky; top:0; z-index:20; display:flex; flex-wrap:wrap; gap:6px; padding:10px 0 12px; margin-bottom:6px; background:var(--bg); border-bottom:1px solid var(--border-soft); }
+        .settings-jump a { font-size:12.5px; color:#9aa7bd; background:var(--bg-soft); border:1px solid var(--border); border-radius:8px; padding:5px 11px; cursor:pointer; user-select:none; transition:all .12s; white-space:nowrap; }
+        .settings-jump a:hover { color:#e8edf6; border-color:var(--accent); background:#1b2740; }
+        .flash-target { animation:flashHighlight 1.2s ease; }
+        @keyframes flashHighlight { 0%,100% { box-shadow:none; } 25% { box-shadow:0 0 0 2px var(--accent); } }
         .tag { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; background:#4f8cff20; color:#93b4ff; margin:2px; cursor:default; }
         .tag-remove { cursor:pointer; margin-left:4px; color:var(--text-dim); }
         .tag-remove:hover { color:var(--red); }
@@ -715,7 +720,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
                     <div style="font-size:11px;line-height:1.6;color:#cbd5e1">
                         <code>response_not_empty</code> · <code>response_contains:text</code> · <code>response_not_contains:text</code><br>
                         <code>response_contains_any:a,b,c</code> · <code>response_matches_regex:pattern</code> · <code>exact_match:text</code><br>
-                        <code>latency_under:5000</code> · <code>token_usage_under:500</code><br>
+                        <code>latency_under:5000</code> · <code>token_usage_under:500</code> · <code>ttft_under:800</code> · <code>tokens_per_second_over:20</code><br>
                         <code>tool_called:name</code> · <code>tool_not_called:name</code> · <code>no_tool_called</code><br>
                         <code>response_is_json</code> · <code>json_field_exists:name,email</code> · <code>classification:pos,neg</code>
                     </div>
@@ -994,8 +999,17 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
 <div class="page" id="page-settings">
     <h1>Settings</h1>
     <div class="subtitle">Set API keys, control evaluation cost & caching, and check which evaluator backends are installed.</div>
+    <div class="settings-jump">
+        <a onclick="jumpToSetting('set-keys')">🔑 API Keys</a>
+        <a onclick="jumpToSetting('set-exec')">⚙️ Execution &amp; Cost</a>
+        <a onclick="jumpToSetting('set-gates')">✅ Quality Gates</a>
+        <a onclick="jumpToSetting('set-notify')">🔔 Notifications</a>
+        <a onclick="jumpToSetting('set-doctor')">🩺 Diagnostics</a>
+        <a onclick="jumpToSetting('set-demo')">🧹 Demo Data</a>
+        <a onclick="jumpToSetting('set-config')">📋 Config</a>
+    </div>
     <div id="settingsKeyStatus" style="margin-bottom:16px"></div>
-    <div class="section">
+    <div class="section" id="set-keys">
         <h2>API Keys</h2>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">These keys are saved to <code>.env</code> file and used for agent authentication and LLM evaluation.</div>
         <div class="form-group">
@@ -1017,7 +1031,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
     </div>
 
     <!-- Execution Settings -->
-    <div class="section">
+    <div class="section" id="set-exec">
         <h2>Execution &amp; Cost Settings</h2>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Configure caching, rate limiting, cost controls, and Foundry integration.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -1053,7 +1067,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
     </div>
 
     <!-- Quality Gates -->
-    <div class="section">
+    <div class="section" id="set-gates">
         <h2>✅ Quality Gates <span style="font-size:12px;color:#64748b;font-weight:400">(CI pass/fail policy)</span></h2>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Fail a run when a threshold is violated. Enforce in CI with <code>attest run --gate</code>. Leave a field blank to skip that check.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
@@ -1069,7 +1083,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
     </div>
 
     <!-- Notifications -->
-    <div class="section">
+    <div class="section" id="set-notify">
         <h2>🔔 Notifications <span style="font-size:12px;color:#64748b;font-weight:400">(Slack / Teams / webhook)</span></h2>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">POST a summary to a webhook when a run finishes.</div>
         <div class="form-group"><label>Webhook URL <span style="color:#64748b;font-size:11px">(blank = disabled)</span></label><input id="notify-url" placeholder="https://hooks.slack.com/services/..." style="margin:0"></div>
@@ -1093,14 +1107,14 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
     </div>
 
     <!-- Diagnostics (doctor) -->
-    <div class="section">
+    <div class="section" id="set-doctor">
         <h2>🩺 Diagnostics <span style="font-size:12px;color:#64748b;font-weight:400">(attest doctor)</span></h2>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Check config, agents, scenarios, evaluator backends, and credentials.</div>
         <button class="btn btn-primary" onclick="runDoctor()">🩺 Run Diagnostics</button>
         <div id="doctorResults" style="margin-top:12px"></div>
     </div>
 
-    <div class="section">
+    <div class="section" id="set-demo">
         <h2>🧹 Demo &amp; Example Data</h2>
         <div style="font-size:13px;color:#9aa7bd;margin-bottom:12px">
             ATTEST ships with example tests and sample results so you can explore every feature
@@ -1118,7 +1132,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
         </div>
     </div>
 
-    <div class="section">
+    <div class="section" id="set-config">
         <h2>Current Configuration</h2>
         <div id="configDisplay">Loading...</div>
     </div>
@@ -1136,7 +1150,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
             <div class="gs-step" onclick="showPage('setup')">
                 <div class="gs-num">1</div>
-                <div><div class="gs-title">🔌 Connect your agent</div><div class="gs-desc">Add an agent (Foundry, HTTP, or MCP) in Agent Setup, then test the connection.</div></div>
+                <div><div class="gs-title">🔌 Connect your agent</div><div class="gs-desc">Add an agent (Foundry, HTTP, A2A, or MCP) in Agent Setup, then test the connection.</div></div>
             </div>
             <div class="gs-step" onclick="showPage('tests')">
                 <div class="gs-num">2</div>
@@ -3285,6 +3299,16 @@ async function saveExecutionSettings() {
         el.innerHTML = `<div style="color:#22c55e;padding:6px;background:#22c55e15;border-radius:6px">✅ ${data.message}</div>`;
         setTimeout(() => el.innerHTML = '', 3000);
     } catch(e) { el.innerHTML = `<div style="color:#ef4444">Error: ${e}</div>`; }
+}
+
+// ===== Settings quick-jump =====
+function jumpToSetting(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+    el.classList.remove('flash-target');
+    void el.offsetWidth; // restart animation
+    el.classList.add('flash-target');
 }
 
 // ===== Quality Gates =====
