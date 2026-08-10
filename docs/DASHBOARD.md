@@ -80,7 +80,9 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 - Shows content / tool-call / routing changes per scenario
 
 ### 8. Settings
-- API key management with show/hide toggle (Azure, OpenAI, and Content Safety endpoint/key)
+- API key management with show/hide toggle and per-key **Clear** buttons (Azure agent key, Azure OpenAI
+  evaluator key, OpenAI key, Content Safety key), plus the Azure OpenAI endpoint, model deployment,
+  and Content Safety endpoint. Keys are stored in `.env` and only masked previews reach the browser
 - Execution & cost settings (caching, rate limit, max eval cost, **evaluator samples**, and
   Foundry publication enablement, SDK/REST method, all-metrics/Azure-only scope, REST fallback,
   and project endpoint)
@@ -145,3 +147,17 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 | POST | `/api/testcases/generate-security` | Generate 30 red team attack tests |
 | POST | `/api/testcases/generate` | AI-generate tests from agent description |
 | GET | `/api/security/categories` | List attack categories |
+
+### Settings & Configuration
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/settings/keys` | Masked key status, Azure endpoint, and deployment |
+| POST | `/api/settings/apikey` | Save a setting, or remove it with `{"key":"","allow_empty":true}` |
+| GET | `/api/execution-config` | Cost, caching, sampling, and Foundry publication settings |
+| POST | `/api/settings/execution` | Update execution and Foundry publication settings |
+| GET | `/api/evaluators/status` | Per-backend availability, including Azure quality, safety, NLP, and protected code |
+
+Foundry publication fields returned by `/api/execution-config` are `foundry_upload`,
+`foundry_upload_backend`, `foundry_metric_scope`, `foundry_rest_fallback`, and
+`foundry_endpoint`. After a published run, `/api/results` also returns
+`foundry_url`, `foundry_upload_status`, and `foundry_upload_backend`.

@@ -62,6 +62,7 @@ Testing AI agents is hard. Responses are non-deterministic, tool calls are invis
 - **Data-driven tests** — point one test at a CSV/JSONL dataset and it expands to one case per row with `{{column}}` templating
 - **Regression & trust over time** — golden baselines, run-vs-run comparison, CI regression gate
 - **Quality gates** — fail CI on pass-rate, p95 latency, cost, or score thresholds (`attest run --gate`)
+- **Publish to Microsoft Foundry** — send results to the portal's Evaluations tab through the official Evaluation SDK and get a direct `studio_url`
 - **Notifications** — Slack / Teams / webhook on run completion
 - **Web dashboard** — visual UI to create, run, and analyze tests without touching the CLI
 - **CI/CD ready** — JUnit XML, Markdown/PR reports, GitHub Actions & Azure DevOps templates, exit codes
@@ -251,6 +252,9 @@ tests:
 attest run                         # Run all tests
 attest run --tag smoke             # Run by tag
 attest run --suite "My Agent Tests"  # Run by suite name
+attest run --gate                  # Enforce quality gates (CI)
+attest run --fail-on-regression    # Fail if a passing test now fails
+attest run --upload-to-foundry     # Publish results to the Foundry portal
 ```
 
 ### 7. View results
@@ -365,6 +369,20 @@ attest/
 | [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) | All 9 test types with YAML, CSV, JSONL, and Python examples |
 | [Evaluation](docs/EVALUATION.md) | 37 evaluators, 4 backends, auth options, custom evaluators |
 | [Dashboard & API](docs/DASHBOARD.md) | Dashboard pages, REST API reference |
+
+---
+
+## Running the tests
+
+```bash
+pip install -e ".[dev]"
+pytest tests/unit -q
+```
+
+Optional evaluator backends (Azure, DeepEval, RAGAS) are not required. Tests that
+exercise a backend's real SDK contract skip automatically when that package is
+absent, which mirrors how ATTEST skips uninstalled backends at runtime. Install
+an extra such as `pip install -e ".[dev,azure]"` to run those tests too.
 
 ---
 
