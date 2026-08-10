@@ -36,6 +36,20 @@ from attest.plugins.azure_eval.evaluators import (
     AzureViolenceEvaluator,
 )
 
+# The Azure evaluation SDK is an optional extra (``pip install attest[azure]``).
+# These tests assert the real SDK contract, so skip them when it is absent.
+try:
+    import azure.ai.evaluation  # noqa: F401
+
+    _AZURE_SDK_INSTALLED = True
+except ImportError:
+    _AZURE_SDK_INSTALLED = False
+
+requires_azure_sdk = pytest.mark.skipif(
+    not _AZURE_SDK_INSTALLED,
+    reason="azure-ai-evaluation is not installed",
+)
+
 
 def _install_fake_evaluation_module(monkeypatch, evaluate):
     module = types.ModuleType("azure.ai.evaluation")
@@ -174,6 +188,7 @@ def test_replay_attest_metrics_returns_only_numeric_values():
     assert result == {"score": 0.75, "passed": 1.0}
 
 
+@requires_azure_sdk
 def test_registry_injects_foundry_project_into_azure_safety_evaluator():
     endpoint = "https://resource.services.ai.azure.com/api/projects/project"
     registry = EvaluatorRegistry(azure_ai_project=endpoint)
@@ -181,6 +196,7 @@ def test_registry_injects_foundry_project_into_azure_safety_evaluator():
     assert evaluator._azure_ai_project == endpoint
 
 
+@requires_azure_sdk
 def test_runner_prefers_canonical_azure_evaluation_project():
     canonical = "https://resource.services.ai.azure.com/api/projects/eval-project"
     reporting = "https://resource.services.ai.azure.com/api/projects/report-project"
@@ -194,6 +210,7 @@ def test_runner_prefers_canonical_azure_evaluation_project():
     assert evaluator._azure_ai_project == canonical
 
 
+@requires_azure_sdk
 def test_runner_injects_azure_quality_model_configuration():
     runner = TestRunner(
         AttestConfig(
@@ -217,6 +234,7 @@ def test_runner_injects_azure_quality_model_configuration():
     assert evaluator._model_config["api_key"] == "test-key"
 
 
+@requires_azure_sdk
 async def test_quality_evaluator_passes_keyless_credential_separately(monkeypatch):
     captured = {}
     credential = object()
@@ -249,6 +267,7 @@ async def test_quality_evaluator_passes_keyless_credential_separately(monkeypatc
     assert "credential" not in captured["model_config"]
 
 
+@requires_azure_sdk
 async def test_safety_evaluator_passes_required_credential(monkeypatch):
     captured = {}
     credential = object()
