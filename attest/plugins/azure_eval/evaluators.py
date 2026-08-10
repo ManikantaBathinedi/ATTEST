@@ -15,7 +15,7 @@ Categories:
     Agent-specific:         TaskAdherence, IntentResolution, ToolCallAccuracy,
                            ResponseCompleteness
     Safety:                 Violence, Sexual, SelfHarm, HateUnfairness,
-                           IndirectAttack, ProtectedMaterial
+                           ProtectedCodeMatch
     NLP (local, free):      F1Score, BleuScore, RougeScore, MeteorScore
 """
 
@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from attest.evaluation.interface import BaseEvaluator, EvaluationInput, EvaluationResult
-
+from attest.plugins.azure_eval.protected_code import AzureProtectedCodeEvaluator
 
 # ---------------------------------------------------------------------------
 # Base class for all Azure evaluator wrappers
@@ -45,11 +45,21 @@ class AzureEvaluatorBase(BaseEvaluator):
         threshold: float = 0.7,
         model_config: Optional[Dict[str, str]] = None,
         azure_ai_project: Optional[Any] = None,
+        credential: Optional[Any] = None,
         **kwargs,
     ):
         super().__init__(threshold=threshold)
         self._model_config = model_config or self._build_model_config()
         self._azure_ai_project = azure_ai_project
+        self._credential = credential
+        if (
+            self._credential is None
+            and (self._azure_ai_project or self._model_config)
+            and "api_key" not in self._model_config
+        ):
+            from attest.utils.azure_client import get_azure_credential
+
+            self._credential = get_azure_credential()
         self._azure_evaluator = None  # Lazy init
 
     @staticmethod
@@ -63,31 +73,25 @@ class AzureEvaluatorBase(BaseEvaluator):
         import os
 
         endpoint = os.environ.get("AZURE_API_BASE", "")
+        deployment = (
+            os.environ.get("AZURE_DEPLOYMENT_NAME")
+            or os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+            or ""
+        )
         api_key = os.environ.get("AZURE_API_KEY_OPENAI") or os.environ.get("AZURE_API_KEY", "")
         api_version = os.environ.get("AZURE_API_VERSION", "2025-04-01-preview")
 
-        if not endpoint:
+        if not endpoint or not deployment:
             return {}
 
         config: Dict[str, str] = {
             "azure_endpoint": endpoint,
+            "azure_deployment": deployment,
             "api_version": api_version,
         }
 
         if api_key:
             config["api_key"] = api_key
-        else:
-            # Try Entra ID (keyless)
-            try:
-                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-                credential = DefaultAzureCredential()
-                token_provider = get_bearer_token_provider(
-                    credential, "https://cognitiveservices.azure.com/.default"
-                )
-                config["azure_ad_token_provider"] = token_provider
-            except Exception:
-                pass  # Will fail at eval time with clear error
-
         return config
 
     @property
@@ -155,7 +159,9 @@ class AzureGroundednessEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import GroundednessEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = GroundednessEvaluator(self._model_config)
+            self._azure_evaluator = GroundednessEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -188,7 +194,9 @@ class AzureRelevanceEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import RelevanceEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = RelevanceEvaluator(self._model_config)
+            self._azure_evaluator = RelevanceEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -220,7 +228,9 @@ class AzureCoherenceEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import CoherenceEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = CoherenceEvaluator(self._model_config)
+            self._azure_evaluator = CoherenceEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -252,7 +262,9 @@ class AzureFluencyEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import FluencyEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = FluencyEvaluator(self._model_config)
+            self._azure_evaluator = FluencyEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(response=input.response)
 
@@ -281,7 +293,9 @@ class AzureSimilarityEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import SimilarityEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = SimilarityEvaluator(self._model_config)
+            self._azure_evaluator = SimilarityEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -319,7 +333,9 @@ class AzureTaskAdherenceEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import TaskAdherenceEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = TaskAdherenceEvaluator(self._model_config)
+            self._azure_evaluator = TaskAdherenceEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -351,7 +367,9 @@ class AzureIntentResolutionEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import IntentResolutionEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = IntentResolutionEvaluator(self._model_config)
+            self._azure_evaluator = IntentResolutionEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -383,7 +401,9 @@ class AzureToolCallAccuracyEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import ToolCallAccuracyEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = ToolCallAccuracyEvaluator(self._model_config)
+            self._azure_evaluator = ToolCallAccuracyEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -415,7 +435,9 @@ class AzureResponseCompletenessEvaluator(AzureEvaluatorBase):
         from azure.ai.evaluation import ResponseCompletenessEvaluator
 
         if self._azure_evaluator is None:
-            self._azure_evaluator = ResponseCompletenessEvaluator(self._model_config)
+            self._azure_evaluator = ResponseCompletenessEvaluator(
+                self._model_config, credential=self._credential
+            )
 
         result = self._azure_evaluator(
             query=input.query,
@@ -468,6 +490,7 @@ class AzureViolenceEvaluator(AzureSafetyEvaluatorBase):
 
         if self._azure_evaluator is None:
             self._azure_evaluator = ViolenceEvaluator(
+                credential=self._credential,
                 azure_ai_project=self._azure_ai_project,
             )
 
@@ -506,6 +529,7 @@ class AzureSexualEvaluator(AzureSafetyEvaluatorBase):
 
         if self._azure_evaluator is None:
             self._azure_evaluator = SexualEvaluator(
+                credential=self._credential,
                 azure_ai_project=self._azure_ai_project,
             )
 
@@ -544,6 +568,7 @@ class AzureSelfHarmEvaluator(AzureSafetyEvaluatorBase):
 
         if self._azure_evaluator is None:
             self._azure_evaluator = SelfHarmEvaluator(
+                credential=self._credential,
                 azure_ai_project=self._azure_ai_project,
             )
 
@@ -582,6 +607,7 @@ class AzureHateUnfairnessEvaluator(AzureSafetyEvaluatorBase):
 
         if self._azure_evaluator is None:
             self._azure_evaluator = HateUnfairnessEvaluator(
+                credential=self._credential,
                 azure_ai_project=self._azure_ai_project,
             )
 
@@ -708,6 +734,7 @@ AZURE_EVALUATORS = {
     "sexual": AzureSexualEvaluator,
     "self_harm": AzureSelfHarmEvaluator,
     "hate_unfairness": AzureHateUnfairnessEvaluator,
+    "protected_code": AzureProtectedCodeEvaluator,
     # NLP (local, free, no LLM cost)
     "f1_score": AzureF1ScoreEvaluator,
     "bleu_score": AzureBleuScoreEvaluator,

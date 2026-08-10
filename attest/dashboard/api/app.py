@@ -137,6 +137,12 @@ async def save_agent(req: AgentSetupRequest):
             "agent_name": req.agent_name,
             "agent_version": req.agent_version or "latest",
         }
+    elif req.type == "foundry_hosted":
+        data["agents"][req.name] = {
+            "type": "foundry_hosted",
+            "endpoint": req.endpoint,
+            "agent_name": req.agent_name,
+        }
     elif req.type == "mcp":
         mcp_cfg = {
             "type": "mcp",
@@ -232,6 +238,10 @@ async def save_api_key(data: dict):
     key = data.get("key", "")
     key_name = data.get("name", "AZURE_API_KEY")
     if not key:
+        if data.get("allow_empty"):
+            _remove_env_key(key_name)
+            os.environ.pop(key_name, None)
+            return {"message": f"{key_name} removed from .env"}
         return JSONResponse({"error": "No key provided"}, status_code=400)
 
     _save_env_key(key_name, key)
@@ -362,26 +372,79 @@ async def evaluator_availability():
         and (os.environ.get("AZURE_API_KEY_OPENAI") or os.environ.get("AZURE_API_KEY"))
     )
     has_openai_key = bool(os.environ.get("OPENAI_API_KEY"))
+    has_content_safety_endpoint = bool(
+        os.environ.get("AZURE_CONTENT_SAFETY_ENDPOINT")
+        or os.environ.get("CONTENT_SAFETY_ENDPOINT")
+    )
+    try:
+        config = load_config(_config_path)
+        azure_model_config = config.evaluation.azure.model_config_dict
+        azure_model_endpoint = (
+            azure_model_config.get("azure_endpoint")
+            or os.environ.get("AZURE_API_BASE")
+        )
+        azure_model_deployment = (
+            azure_model_config.get("azure_deployment")
+            or os.environ.get("AZURE_DEPLOYMENT_NAME")
+            or (
+                config.evaluation.judge.model[len("azure/"):]
+                if config.evaluation.judge.model.startswith("azure/")
+                else ""
+            )
+        )
+        has_foundry_project = bool(
+            config.evaluation.azure.project
+            or config.reporting.foundry_endpoint
+            or any(
+                agent.endpoint
+                for agent in config.agents.values()
+                if agent.type in (
+                    "foundry_prompt",
+                    "foundry_hosted",
+                    "foundry_container",
+                )
+            )
+        )
+    except Exception:
+        has_foundry_project = False
+        azure_model_endpoint = os.environ.get("AZURE_API_BASE", "")
+        azure_model_deployment = os.environ.get("AZURE_DEPLOYMENT_NAME", "")
+    has_azure_model = bool(azure_model_endpoint and azure_model_deployment)
+    has_llm_judge = bool(has_openai_key or has_azure_keys or has_azure_model)
 
     return {
         "deepeval": {
             "installed": deepeval_installed,
-            "configured": deepeval_installed and (has_azure_keys or has_openai_key),
+            "configured": deepeval_installed and has_llm_judge,
             "message": "" if deepeval_installed else "pip install deepeval",
         },
         "azure_eval": {
             "installed": azure_eval_installed,
-            "configured": azure_eval_installed,
+            "configured": azure_eval_installed and (
+                has_azure_model or has_foundry_project
+            ),
+            "quality_configured": azure_eval_installed and has_azure_model,
+            "safety_configured": azure_eval_installed and has_foundry_project,
+            "safety_requires_entra": True,
+            "nlp_configured": azure_eval_installed,
             "message": "" if azure_eval_installed else "pip install azure-ai-evaluation",
+        },
+        "protected_code": {
+            "installed": azure_eval_installed,
+            "configured": azure_eval_installed and has_content_safety_endpoint,
+            "message": (
+                "" if has_content_safety_endpoint
+                else "Set AZURE_CONTENT_SAFETY_ENDPOINT"
+            ),
         },
         "ragas": {
             "installed": ragas_installed,
-            "configured": ragas_installed and (has_azure_keys or has_openai_key),
+            "configured": ragas_installed and has_llm_judge,
             "message": "" if ragas_installed else "pip install ragas langchain-openai",
         },
         "builtin": {
             "installed": True,
-            "configured": has_azure_keys or has_openai_key,
+            "configured": has_llm_judge,
             "message": "",
         },
     }
@@ -1299,42 +1362,31 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
 
         runner = TestRunner(config)
 
-        # Setup adapters first
-        await runner._setup_adapters(test_cases)
+        def _on_result(tc, result):
+            status_icon = (
+                "✅" if result.status.value == "passed"
+                else "❌" if result.status.value == "failed"
+                else "⚠️"
+            )
+            _run_progress["current"] = tc.name
+            _run_progress["results"].append({
+                "name": tc.name,
+                "status": result.status.value,
+                "icon": status_icon,
+                "latency_ms": round(result.latency_ms),
+            })
+            _run_progress["completed"] = len(_run_progress["results"])
 
-        # Run tests one by one with progress updates
-        all_results = []
-        try:
-            for i, tc in enumerate(test_cases):
-                if _cancel_requested:
-                    _run_progress["current"] = "Cancelled"
-                    break
-                _run_progress["current"] = tc.name
-                _run_progress["completed"] = i
-
-                result = await runner._run_single(tc)
-                all_results.append(result)
-
-                # Update progress with latest result
-                status_icon = "✅" if result.status.value == "passed" else "❌" if result.status.value == "failed" else "⚠️"
-                _run_progress["results"].append({
-                    "name": tc.name,
-                    "status": result.status.value,
-                    "icon": status_icon,
-                    "latency_ms": round(result.latency_ms),
-                })
-                _run_progress["completed"] = i + 1
-        finally:
-            await runner._teardown_adapters()
-
-        # Build summary from collected results
-        from attest.core.models import RunSummary
-        import uuid
-        new_summary = RunSummary(
-            run_id=f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        new_summary = await runner.run(
+            test_cases,
+            verbose=False,
+            parallel=1,
+            should_cancel=lambda: _cancel_requested,
+            on_result=_on_result,
         )
-        for r in all_results:
-            new_summary.add_result(r)
+
+        if _cancel_requested:
+            _run_progress["current"] = "Cancelled"
 
         output_dir = Path(config.reporting.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1348,6 +1400,9 @@ async def _execute_tests(suite_filter: Optional[str] = None, test_name_filter: O
                 new_rows = json.loads(new_summary.model_dump_json()).get("results", [])
                 existing = merge_results(existing, new_rows)
                 existing["timestamp"] = new_summary.timestamp.isoformat()
+                existing["foundry_upload_status"] = new_summary.foundry_upload_status
+                existing["foundry_upload_backend"] = new_summary.foundry_upload_backend
+                existing["foundry_url"] = new_summary.foundry_url
                 json_path.write_text(json.dumps(existing, indent=2, default=str), encoding="utf-8")
             except Exception:
                 # Fallback: just overwrite
@@ -1837,15 +1892,25 @@ async def get_api_keys():
         return "\u2022" * len(val)
 
     azure_key = os.environ.get("AZURE_API_KEY", "")
+    azure_eval_key = os.environ.get("AZURE_API_KEY_OPENAI", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     azure_base = os.environ.get("AZURE_API_BASE", "")
+    azure_deployment = os.environ.get("AZURE_DEPLOYMENT_NAME", "")
+    content_safety_key = os.environ.get("AZURE_CONTENT_SAFETY_KEY", "")
+    content_safety_endpoint = os.environ.get("AZURE_CONTENT_SAFETY_ENDPOINT", "")
 
     return {
         "azure_api_key_masked": mask(azure_key),
+        "azure_eval_key_masked": mask(azure_eval_key),
         "openai_api_key_masked": mask(openai_key),
         "azure_api_base": azure_base,
+        "azure_deployment": azure_deployment,
+        "content_safety_key_masked": mask(content_safety_key),
+        "content_safety_endpoint": content_safety_endpoint,
         "has_azure_key": bool(azure_key),
+        "has_azure_eval_key": bool(azure_eval_key),
         "has_openai_key": bool(openai_key),
+        "has_content_safety_key": bool(content_safety_key),
     }
 
 
@@ -1888,6 +1953,19 @@ def _save_env_key(key_name: str, key_value: str) -> None:
         lines.append(f"{key_name}={key_value}")
 
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _remove_env_key(key_name: str) -> None:
+    """Remove a setting from the .env file if present."""
+    env_path = Path(".env")
+    if not env_path.exists():
+        return
+    lines = [
+        line
+        for line in env_path.read_text(encoding="utf-8").splitlines()
+        if not line.strip().startswith(f"{key_name}=")
+    ]
+    env_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -2094,6 +2172,10 @@ async def get_execution_config():
             "max_eval_cost_per_run": config.evaluation.cost.max_eval_cost_per_run,
             "eval_samples": getattr(config.evaluation, "samples", 1),
             "foundry_upload": config.reporting.foundry_upload,
+            "foundry_upload_backend": config.reporting.foundry_upload_backend,
+            "foundry_metric_scope": config.reporting.foundry_metric_scope,
+            "foundry_rest_fallback": config.reporting.foundry_rest_fallback,
+            "foundry_endpoint": config.reporting.foundry_endpoint or "",
             "profiles": profiles,
         }
     except Exception as e:
@@ -2298,6 +2380,26 @@ async def save_execution_settings(data: dict):
         raw["evaluation"]["samples"] = max(1, int(data["eval_samples"]))
     if "foundry_upload" in data:
         raw["reporting"]["foundry_upload"] = bool(data["foundry_upload"])
+    if "foundry_upload_backend" in data:
+        backend = str(data["foundry_upload_backend"])
+        raw["reporting"]["foundry_upload_backend"] = (
+            backend if backend in ("sdk", "rest") else "sdk"
+        )
+    if "foundry_metric_scope" in data:
+        scope = str(data["foundry_metric_scope"])
+        raw["reporting"]["foundry_metric_scope"] = (
+            scope if scope in ("all", "azure_only") else "all"
+        )
+    if "foundry_rest_fallback" in data:
+        raw["reporting"]["foundry_rest_fallback"] = bool(
+            data["foundry_rest_fallback"]
+        )
+    if "foundry_endpoint" in data:
+        endpoint = str(data["foundry_endpoint"]).strip()
+        if endpoint:
+            raw["reporting"]["foundry_endpoint"] = endpoint
+        else:
+            raw["reporting"].pop("foundry_endpoint", None)
 
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(raw, f)

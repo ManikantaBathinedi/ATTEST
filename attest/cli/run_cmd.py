@@ -35,6 +35,7 @@ async def run_tests(
     return_results: bool = False,
     fail_on_regression: bool = False,
     enforce_gates: bool = False,
+    upload_to_foundry: bool = False,
 ) -> Optional[List[TestResult]]:
     """Execute all test scenarios.
 
@@ -51,6 +52,8 @@ async def run_tests(
         return_results: If True, return list of TestResult instead of None.
         fail_on_regression: If True, exit non-zero when a test that passed in
             the previous run now fails/errors (regression gate for CI).
+        upload_to_foundry: If True, force-enable uploading results to the Azure
+            Foundry portal (overrides reporting.foundry_upload in attest.yaml).
     """
     # Step 1: Load config
     try:
@@ -58,6 +61,9 @@ async def run_tests(
     except AttestError as e:
         console.print(f"[red]Error loading config:[/red] {e}")
         raise SystemExit(1)
+
+    if upload_to_foundry:
+        config.reporting.foundry_upload = True
 
     if not config.agents:
         console.print(

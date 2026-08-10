@@ -57,6 +57,8 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
         self._api_key = api_key
         self._openai_client = None
         self._connected = False
+        self._hosted_adapter = None
+        self._hosted_detected = False
 
     async def setup(self) -> None:
         """Connect to the Foundry agent.
@@ -115,6 +117,8 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
 
     async def teardown(self) -> None:
         """Cleanup."""
+        if self._hosted_adapter is not None:
+            await self._hosted_adapter.teardown()
         self._openai_client = None
         self._connected = False
 
@@ -135,6 +139,9 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
                 messages.append({"role": msg.role, "content": msg.content})
         messages.append({"role": "user", "content": message})
 
+        if self._hosted_detected:
+            return await self._send_via_hosted(message, conversation_history, metadata)
+
         # Call the agent
         start_time = time.perf_counter()
         try:
@@ -149,6 +156,11 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
                 },
             )
         except Exception as e:
+            # Hosted (container) agents reject agent_reference with a 400. Fall
+            # back to the dedicated hosted-agent endpoint transparently.
+            if self._is_hosted_agent_error(e):
+                self._hosted_detected = True
+                return await self._send_via_hosted(message, conversation_history, metadata)
             raise AdapterError(f"Agent call failed: {e}") from e
 
         latency_ms = (time.perf_counter() - start_time) * 1000
@@ -199,6 +211,34 @@ class FoundryPromptAgentAdapter(BaseAgentAdapter):
             tool_calls=tool_calls,
             token_usage=token_usage,
             raw_response=response,
+        )
+
+    @staticmethod
+    def _is_hosted_agent_error(err: Exception) -> bool:
+        """Detect the 400 returned when calling a hosted agent via agent_reference."""
+        msg = str(err).lower()
+        return (
+            "hosted agent" in msg
+            and "only be called through the agent endpoint" in msg
+        )
+
+    async def _send_via_hosted(
+        self,
+        message: str,
+        conversation_history: Optional[List[Message]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> AgentResponse:
+        """Fallback path: call the agent as a hosted (container) agent."""
+        if self._hosted_adapter is None:
+            from attest.adapters.foundry.hosted_agent import FoundryHostedAgentAdapter
+
+            self._hosted_adapter = FoundryHostedAgentAdapter(
+                endpoint=self._endpoint,
+                agent_name=self._agent_name,
+                api_key=self._api_key,
+            )
+        return await self._hosted_adapter.send_message(
+            message, conversation_history, metadata
         )
 
     async def health_check(self) -> bool:

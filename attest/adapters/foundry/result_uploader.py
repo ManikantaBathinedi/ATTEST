@@ -15,6 +15,7 @@ From CLI:
 From YAML config:
     reporting:
       foundry_upload: true
+      foundry_endpoint: "https://..."   # optional — defaults to your Foundry agent's endpoint
 """
 
 from __future__ import annotations
@@ -31,6 +32,12 @@ from attest.core.models import RunSummary, TestResult, Status
 
 logger = logging.getLogger(__name__)
 
+# Data-plane scope for Azure AI Foundry (NOT the ARM management scope).
+FOUNDRY_TOKEN_SCOPE = "https://ai.azure.com/.default"
+
+# Foundry REST requires an explicit api-version on every request.
+DEFAULT_API_VERSION = "v1"
+
 
 class FoundryResultUploader:
     """Upload ATTEST test results to Azure Foundry portal."""
@@ -39,14 +46,17 @@ class FoundryResultUploader:
         self,
         endpoint: str,
         api_key: Optional[str] = None,
+        api_version: str = DEFAULT_API_VERSION,
     ):
         """
         Args:
             endpoint: Foundry project endpoint URL.
             api_key: API key (optional — falls back to env vars / Azure credential).
+            api_version: API version query parameter required by Foundry REST.
         """
         self._endpoint = endpoint.rstrip("/")
         self._api_key = api_key
+        self._api_version = api_version
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -64,14 +74,15 @@ class FoundryResultUploader:
         )
 
         if key:
-            headers["Authorization"] = f"Bearer {key}"
+            # Foundry expects the key in the api-key header (not a Bearer token).
+            headers["api-key"] = key
         else:
             # Token-based auth (SP, WIF, Managed Identity, CLI)
             try:
                 from attest.utils.azure_client import get_azure_credential
 
                 credential = get_azure_credential()
-                token = credential.get_token("https://management.azure.com/.default")
+                token = credential.get_token(FOUNDRY_TOKEN_SCOPE)
                 headers["Authorization"] = f"Bearer {token.token}"
             except Exception as e:
                 logger.warning(f"Could not get Azure credential for Foundry upload: {e}")
@@ -79,6 +90,7 @@ class FoundryResultUploader:
         self._client = httpx.AsyncClient(
             base_url=self._endpoint,
             headers=headers,
+            params={"api-version": self._api_version},
             timeout=30.0,
         )
         return self._client
@@ -172,7 +184,8 @@ class FoundryResultUploader:
                     f"Successfully uploaded run '{summary.run_id}' to Foundry "
                     f"({summary.total} tests, {summary.pass_rate:.0%} pass rate)"
                 )
-                return response.json() if response.text else {"status": "uploaded"}
+                response_data = response.json() if response.text else {}
+                return {**response_data, "status": "uploaded", "backend": "rest"}
 
             # Fallback: try the runs endpoint
             response = await client.post(
@@ -182,19 +195,25 @@ class FoundryResultUploader:
 
             if response.status_code in (200, 201, 202):
                 logger.info(f"Uploaded run '{summary.run_id}' to Foundry via /runs endpoint")
-                return response.json() if response.text else {"status": "uploaded"}
+                response_data = response.json() if response.text else {}
+                return {**response_data, "status": "uploaded", "backend": "rest"}
 
             logger.warning(
                 f"Foundry upload returned status {response.status_code}: {response.text[:200]}"
             )
-            return {"status": "failed", "code": response.status_code, "detail": response.text[:200]}
+            return {
+                "status": "failed",
+                "backend": "rest",
+                "code": response.status_code,
+                "detail": response.text[:200],
+            }
 
         except httpx.ConnectError as e:
             logger.warning(f"Could not connect to Foundry for result upload: {e}")
-            return {"status": "connection_error", "detail": str(e)}
+            return {"status": "connection_error", "backend": "rest", "detail": str(e)}
         except Exception as e:
             logger.warning(f"Foundry upload failed: {e}")
-            return {"status": "error", "detail": str(e)}
+            return {"status": "error", "backend": "rest", "detail": str(e)}
 
     async def close(self) -> None:
         """Close the HTTP client."""

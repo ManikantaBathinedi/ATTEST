@@ -1,4 +1,11 @@
-# ATTEST — Web Dashboard
+---
+title: ATTEST Web Dashboard
+description: Configure agents, create tests, run evaluations, and manage Foundry publication from the ATTEST dashboard.
+ms.date: 2026-08-10
+ms.topic: reference
+---
+
+## Web Dashboard
 
 > `attest serve` → opens http://localhost:8080
 >
@@ -39,8 +46,10 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 ### 3. Test Cases
 - **Create Test**: Form with test name, suite selector, input, expected output, context, test
   type (single-turn / multi-turn / user simulation), assertion cards (Response Checks, Safety &
-  Quality, Tool Call, **🔀 Multi-Agent Routing**, Structured Output / JSON), 36 evaluators across
+  Quality, Tool Call, **🔀 Multi-Agent Routing**, Structured Output / JSON), 37 evaluators across
   4 backends with status badges, and tags input
+- Evaluator presets: select all evaluators, select Azure/Foundry evaluators only, or clear the
+  current selection; individual and per-card selection remain available
 - **Upload**: Download CSV/JSONL templates, upload bulk test cases, auto-creates YAML suite files
 - **All Tests**: Table view with name, suite, type, input, tags, assertions, evaluators
 
@@ -71,8 +80,10 @@ The sidebar groups pages into **Setup**, **Run & Evaluate**, and **Advanced**, w
 - Shows content / tool-call / routing changes per scenario
 
 ### 8. Settings
-- API key management with show/hide toggle (Azure + OpenAI)
-- Execution & cost settings (caching, rate limit, max eval cost, **evaluator samples** for flakiness control, Foundry upload)
+- API key management with show/hide toggle (Azure, OpenAI, and Content Safety endpoint/key)
+- Execution & cost settings (caching, rate limit, max eval cost, **evaluator samples**, and
+  Foundry publication enablement, SDK/REST method, all-metrics/Azure-only scope, REST fallback,
+  and project endpoint)
 - **✅ Quality Gates** — set CI pass/fail thresholds (pass rate, failed/errors, p95 latency, cost, avg score); enforce with `attest run --gate`
 - **🔔 Notifications** — Slack / Teams / generic webhook on run completion, with a **Send Test** button
 - **🩺 Diagnostics** — in-dashboard `attest doctor`: checks config, agents, scenarios, evaluator backends & credentials

@@ -1,4 +1,11 @@
-# ATTEST — Getting Started (Step-by-Step)
+---
+title: ATTEST Getting Started
+description: Configure an agent, run ATTEST evaluations, and publish results to Microsoft Foundry.
+ms.date: 2026-08-10
+ms.topic: tutorial
+---
+
+## Getting Started
 
 This guide takes you from zero to running your first agent test.
 
@@ -51,7 +58,7 @@ pip install -e "."
 # Optional: DeepEval metrics (bias, toxicity, RAG evaluation)
 pip install deepeval
 
-# Optional: Azure AI Evaluation SDK (15 production-grade metrics)
+# Optional: Azure AI Evaluation SDK and Content Safety (16 metrics)
 pip install azure-ai-evaluation
 
 # Optional: All extras
@@ -80,6 +87,31 @@ evaluation:
   judge:
     model: "azure/gpt-4.1-mini"            # deployment name in your Azure OpenAI resource
 ```
+
+### Which Foundry agent type do I have?
+
+Azure AI Foundry has two agent types, and ATTEST has an adapter for each:
+
+| Your agent in Foundry | ATTEST `type` | How it's called |
+|-----------------------|---------------|-----------------|
+| **Prompt agent** (prompt-flow / YAML-defined) | `foundry_prompt` | Responses API with an `agent_reference` in the body |
+| **Hosted agent** (runs as a Docker container) | `foundry_hosted` | The agent's own endpoint: `/agents/{name}/endpoint/protocols/openai/responses?api-version=v1` |
+
+For a hosted agent, drop the `agent_version` (hosted agents don't use one):
+
+```yaml
+agents:
+  my_hosted_agent:
+    type: foundry_hosted
+    endpoint: "https://your-resource.services.ai.azure.com/api/projects/your-project"
+    agent_name: "Your-Hosted-Agent"
+```
+
+> **Auto-detection:** If you're unsure, keep `type: foundry_prompt`. When ATTEST
+> calls a hosted agent with the prompt-style request it gets a `400` ("hosted
+> agents can only be called through the agent endpoint") and **automatically
+> retries against the hosted endpoint** — so your tests still pass. Setting
+> `foundry_hosted` explicitly just skips that first failed attempt.
 
 For HTTP agents:
 ```yaml
@@ -111,6 +143,7 @@ AZURE_API_KEY=your-azure-api-key-here
 
 # LLM judge (for evaluators)
 AZURE_API_BASE=https://your-resource.openai.azure.com
+AZURE_DEPLOYMENT_NAME=gpt-4.1-mini
 AZURE_API_KEY_OPENAI=your-azure-openai-key-here
 AZURE_API_VERSION=2025-04-01-preview
 ```
@@ -131,11 +164,16 @@ az login
 # 2. Install azure-identity
 pip install azure-identity
 
-# 3. Set only the endpoint in .env (no keys!)
+# 3. Set the non-secret model values in .env (no keys!)
 AZURE_API_BASE=https://your-resource.openai.azure.com
+AZURE_DEPLOYMENT_NAME=gpt-4.1-mini
 ```
 
 ATTEST auto-detects: no key → uses `DefaultAzureCredential` → authenticates via your Azure CLI login, managed identity, or environment credentials. Works for the agent adapter, all evaluators (built-in, DeepEval, Azure), user simulation, and AI test generation.
+
+Azure hosted safety evaluators require Entra ID even when other evaluator
+families use API keys. Run `az login` locally, or configure workload, managed,
+or service-principal identity in CI and Azure environments.
 
 > **Important:** You still need `attest.yaml` for non-secret config (agent endpoint, model name, etc.). Only the *keys* are eliminated — the URLs and settings stay in the config.
 
@@ -148,6 +186,7 @@ ATTEST auto-detects: no key → uses `DefaultAzureCredential` → authenticates 
 | Agent name & version | `attest.yaml` → `agents.*.agent_name` | No |
 | Eval model deployment | `attest.yaml` → `evaluation.judge.model` | No |
 | Azure OpenAI endpoint | `.env` → `AZURE_API_BASE` | No |
+| Azure evaluator deployment | `evaluation.judge.model: azure/<deployment>` or `.env` → `AZURE_DEPLOYMENT_NAME` | No |
 | Test scenarios | `tests/scenarios/*.yaml` | No |
 
 ---
@@ -159,6 +198,60 @@ attest test-connection
 ```
 
 You should see: `✅ Connected (XXXms)`
+
+### Optional: Publish results to Foundry
+
+ATTEST can publish completed runs to the **Evaluations** tab in Microsoft
+Foundry by using the official `azure.ai.evaluation.evaluate()` API.
+
+Install the Azure integration and sign in with an identity that can write
+evaluation runs to the project:
+
+```powershell
+pip install -e ".[azure]"
+az login
+```
+
+Enable publication in `attest.yaml`:
+
+```yaml
+reporting:
+  foundry_upload: true
+  foundry_upload_backend: sdk
+  foundry_metric_scope: all
+  foundry_rest_fallback: false
+  # Optional when a Foundry agent already supplies the project endpoint.
+  foundry_endpoint: "https://resource.services.ai.azure.com/api/projects/project"
+```
+
+You can also enable it for one run:
+
+```powershell
+attest run --upload-to-foundry
+```
+
+ATTEST prints the SDK-provided `studio_url` after a successful upload. The
+input dataset and SDK result are retained under `reports/foundry/` for local
+diagnostics. ATTEST replays its existing evaluator and assertion scores into
+the portal run, so publishing does not repeat LLM evaluations or add duplicate
+judge cost.
+
+Foundry supports custom evaluator outputs, so the recommended `all` scope
+publishes every ATTEST metric with its source in the name. Examples include
+`score_azure_groundedness`, `score_deepeval_faithfulness`,
+`score_ragas_context_precision`, and `score_builtin_relevancy`. This preserves
+one complete quality view without presenting external scores as native Azure
+metrics. Set `foundry_metric_scope: azure_only` to exclude built-in, DeepEval,
+RAGAS, and assertion metrics from the portal dataset.
+
+> [!IMPORTANT]
+> Portal publication uses Azure CLI or Microsoft Entra ID credentials. An
+> agent API key alone does not grant permission to create Foundry evaluation
+> runs.
+
+The dashboard exposes the same options under **Settings > Execution & Cost**.
+The legacy REST implementation is disabled as a fallback unless
+`foundry_rest_fallback` is explicitly enabled.
 
 ---
 

@@ -282,6 +282,11 @@ class RunSummary(BaseModel):
     # Aggregate performance stats (latency/TTFT/token/cost percentiles, throughput).
     perf: Dict[str, Any] = Field(default_factory=dict)
 
+    # Foundry portal publication details (set only when upload is enabled).
+    foundry_upload_status: Optional[str] = None
+    foundry_upload_backend: Optional[str] = None
+    foundry_url: Optional[str] = None
+
     # Individual results
     results: List[TestResult] = Field(default_factory=list)
 

@@ -234,6 +234,7 @@
             <div class="form-group"><label>Agent Name (unique key)</label><input id="s-name" value="" placeholder="my_agent"></div>
             <div class="form-group"><label>Agent Type</label><select id="s-type" onchange="toggleAgentFields()">
                 <option value="foundry_prompt">Azure Foundry Prompt Agent</option>
+                <option value="foundry_hosted">Azure Foundry Hosted (Container) Agent</option>
                 <option value="http">HTTP / REST API</option>
                 <option value="a2a">A2A (Agent2Agent Protocol)</option>
                 <option value="mcp">MCP Server (Model Context Protocol)</option>
@@ -244,8 +245,9 @@
             <div class="form-group"><label>Project Endpoint</label><input id="s-endpoint" placeholder="https://your-resource.services.ai.azure.com/api/projects/your-project"></div>
             <div class="form-row">
                 <div class="form-group"><label>Agent Name (in Foundry)</label><input id="s-agent-name" placeholder="Travel-Agent"></div>
-                <div class="form-group"><label>Agent Version</label><input id="s-agent-version" value="latest" placeholder="3"></div>
+                <div class="form-group" id="agentVersionGroup"><label>Agent Version</label><input id="s-agent-version" value="latest" placeholder="3"></div>
             </div>
+            <div id="foundryHostedHint" style="display:none;font-size:12px;color:#64748b;margin-top:-4px">Hosted container agents don't use a version — ATTEST calls the agent's own endpoint (<code>?api-version=v1</code>).</div>
         </div>
         <div id="httpFields" style="display:none">
             <div class="form-group"><label>Endpoint URL</label><input id="s-http-endpoint" placeholder="http://localhost:8000"></div>
@@ -540,7 +542,17 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
         </div>
 
         <!-- Evaluators -->
-        <div class="form-group" style="margin-top:12px"><label>Evaluators</label></div>
+        <div class="form-group" style="margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                <label style="margin:0">Evaluators</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button id="evalPresetAll" type="button" class="btn btn-outline btn-sm" onclick="selectEvaluatorPreset('all')" disabled>Loading Evaluators...</button>
+                    <button id="evalPresetAzure" type="button" class="btn btn-outline btn-sm" onclick="selectEvaluatorPreset('azure')" disabled>Azure / Foundry Only</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="selectEvaluatorPreset('clear')">Clear</button>
+                </div>
+            </div>
+            <div id="evaluatorPresetSummary" style="font-size:11px;color:#64748b;margin-top:6px">Loading evaluator availability...</div>
+        </div>
 
         <div class="section-card">
             <div class="section-card-header" onclick="toggleCard(this)">
@@ -611,17 +623,17 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             </div>
             <div class="section-card-body" style="display:none">
                 <div class="checkbox-group">
-                    <label><input type="checkbox" data-eval="groundedness"> <span>Groundedness</span></label>
-                    <label><input type="checkbox" data-eval="azure_relevance"> <span>Relevance</span></label>
-                    <label><input type="checkbox" data-eval="coherence"> <span>Coherence</span></label>
-                    <label><input type="checkbox" data-eval="fluency"> <span>Fluency</span></label>
-                    <label><input type="checkbox" data-eval="similarity"> <span>Similarity</span></label>
+                    <label><input type="checkbox" data-eval="groundedness" data-backend="azure"> <span>Groundedness</span></label>
+                    <label><input type="checkbox" data-eval="azure_relevance" data-backend="azure"> <span>Relevance</span></label>
+                    <label><input type="checkbox" data-eval="coherence" data-backend="azure"> <span>Coherence</span></label>
+                    <label><input type="checkbox" data-eval="fluency" data-backend="azure"> <span>Fluency</span></label>
+                    <label><input type="checkbox" data-eval="similarity" data-backend="azure"> <span>Similarity</span></label>
                 </div>
                 <div class="checkbox-group" style="margin-top:4px">
-                    <label><input type="checkbox" data-eval="task_adherence"> <span>Task Adherence</span></label>
-                    <label><input type="checkbox" data-eval="intent_resolution"> <span>Intent Resolution</span></label>
-                    <label><input type="checkbox" data-eval="tool_call_accuracy"> <span>Tool Call Accuracy</span></label>
-                    <label><input type="checkbox" data-eval="response_completeness"> <span>Response Completeness</span></label>
+                    <label><input type="checkbox" data-eval="task_adherence" data-backend="azure"> <span>Task Adherence</span></label>
+                    <label><input type="checkbox" data-eval="intent_resolution" data-backend="azure"> <span>Intent Resolution</span></label>
+                    <label><input type="checkbox" data-eval="tool_call_accuracy" data-backend="azure"> <span>Tool Call Accuracy</span></label>
+                    <label><input type="checkbox" data-eval="response_completeness" data-backend="azure"> <span>Response Completeness</span></label>
                 </div>
             </div>
         </div>
@@ -630,20 +642,22 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             <div class="section-card-header" onclick="toggleCard(this)">
                 <span class="caret">▶</span>
                 <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
-                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#3b82f6">☁️ Azure AI — Safety & NLP (6)</span>
+                    <input type="checkbox" style="width:auto;margin:0" onchange="toggleAllInCard(this,'eval')"> <span style="font-size:13px;color:#3b82f6">☁️ Azure AI — Safety & NLP (7)</span>
                 </label>
                 <span id="azure-eval-status2" style="font-size:10px;color:#475569"></span>
-                <span style="font-size:10px;color:#475569">— free</span>
+                <span style="font-size:10px;color:#475569">— Azure-hosted safety + local NLP</span>
             </div>
             <div class="section-card-body" style="display:none">
                 <div class="checkbox-group">
-                    <label><input type="checkbox" data-eval="violence"> <span>Violence</span></label>
-                    <label><input type="checkbox" data-eval="sexual"> <span>Sexual</span></label>
-                    <label><input type="checkbox" data-eval="self_harm"> <span>Self Harm</span></label>
-                    <label><input type="checkbox" data-eval="hate_unfairness"> <span>Hate/Unfairness</span></label>
-                    <label><input type="checkbox" data-eval="f1_score"> <span>F1 Score</span></label>
-                    <label><input type="checkbox" data-eval="bleu_score"> <span>BLEU Score</span></label>
+                    <label><input type="checkbox" data-eval="violence" data-backend="azure"> <span>Violence</span></label>
+                    <label><input type="checkbox" data-eval="sexual" data-backend="azure"> <span>Sexual</span></label>
+                    <label><input type="checkbox" data-eval="self_harm" data-backend="azure"> <span>Self Harm</span></label>
+                    <label><input type="checkbox" data-eval="hate_unfairness" data-backend="azure"> <span>Hate/Unfairness</span></label>
+                    <label title="Preview: detects generated code that matches code indexed from known GitHub repositories; returns source URLs and license metadata"><input type="checkbox" data-eval="protected_code" data-backend="azure"> <span>Protected Code Match (Preview)</span></label>
+                    <label><input type="checkbox" data-eval="f1_score" data-backend="azure"> <span>F1 Score</span></label>
+                    <label><input type="checkbox" data-eval="bleu_score" data-backend="azure"> <span>BLEU Score</span></label>
                 </div>
+                <div style="font-size:11px;color:#64748b;margin-top:6px"><strong>Protected Code Match</strong> checks generated code against Microsoft's known GitHub index and returns citations/licenses. A match requires review; it does not by itself prove infringement. The index is current through April 6, 2023.</div>
             </div>
         </div>
 
@@ -729,7 +743,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
                     <div style="font-size:11px;line-height:1.6;color:#cbd5e1">
                         <b>Built-in:</b> <code>correctness</code> · <code>relevancy</code> · <code>hallucination</code> · <code>completeness</code> · <code>tone</code><br>
                         <b>DeepEval:</b> <code>deepeval_correctness</code> · <code>deepeval_relevancy</code> · <code>deepeval_faithfulness</code> · <code>deepeval_toxicity</code> · <code>deepeval_bias</code><br>
-                        <b>Azure:</b> <code>groundedness</code> · <code>coherence</code> · <code>fluency</code> · <code>task_adherence</code> · <code>violence</code>
+                        <b>Azure:</b> <code>groundedness</code> · <code>coherence</code> · <code>fluency</code> · <code>task_adherence</code> · <code>violence</code> · <code>protected_code</code>
                     </div>
                 </div>
             </div>
@@ -919,6 +933,7 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
 
     <!-- Filters -->
     <div id="resultsRunBanner"></div>
+    <div id="foundryUploadBanner"></div>
     <div id="resultsPerfPanel" style="display:none;margin-bottom:15px"></div>
     <div style="display:flex;gap:12px;margin-bottom:15px;align-items:center">
         <span style="font-size:13px;color:#94a3b8">Filter:</span>
@@ -1017,6 +1032,25 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             <div style="display:flex;gap:8px;align-items:center">
                 <input id="set-azure-key" type="password" placeholder="Paste your Azure API key here" style="flex:1;margin:0">
                 <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-azure-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+                <button class="btn btn-outline btn-sm" onclick="clearEnvSetting('AZURE_API_KEY','Azure API key')" title="Remove the saved key and use keyless auth">Clear</button>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Azure OpenAI Endpoint <span style="color:#64748b;font-size:11px">(required for Azure quality evaluators)</span></label>
+                <input id="set-azure-base" placeholder="https://your-resource.openai.azure.com" style="margin:0">
+            </div>
+            <div class="form-group">
+                <label>Azure Model Deployment <span style="color:#64748b;font-size:11px">(for evaluator judges)</span></label>
+                <input id="set-azure-deployment" placeholder="gpt-4.1-mini" style="margin:0">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Azure OpenAI Evaluator Key <span style="color:#64748b;font-size:11px">(optional with Entra ID; overrides the general Azure key for evaluators)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input id="set-azure-eval-key" type="password" placeholder="Paste evaluator-specific Azure key, or use az login" style="flex:1;margin:0">
+                <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-azure-eval-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+                <button class="btn btn-outline btn-sm" onclick="clearEnvSetting('AZURE_API_KEY_OPENAI','Azure evaluator key')" title="Remove the saved key and use Entra ID">Clear</button>
             </div>
         </div>
         <div class="form-group">
@@ -1024,6 +1058,19 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
             <div style="display:flex;gap:8px;align-items:center">
                 <input id="set-openai-key" type="password" placeholder="sk-... (optional — skip if using Azure)" style="flex:1;margin:0">
                 <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-openai-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+                <button class="btn btn-outline btn-sm" onclick="clearEnvSetting('OPENAI_API_KEY','OpenAI API key')" title="Remove the saved key">Clear</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Azure Content Safety Endpoint <span style="color:#64748b;font-size:11px">(required for Protected Code Match)</span></label>
+            <input id="set-content-safety-endpoint" placeholder="https://your-resource.cognitiveservices.azure.com" style="margin:0">
+        </div>
+        <div class="form-group">
+            <label>Azure Content Safety Key <span style="color:#64748b;font-size:11px">(optional with Entra ID)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input id="set-content-safety-key" type="password" placeholder="Paste Content Safety key, or use az login" style="flex:1;margin:0">
+                <button class="btn btn-outline btn-sm" onclick="toggleKeyVisibility('set-content-safety-key', this)" style="min-width:40px" title="Show/hide key">👁</button>
+                <button class="btn btn-outline btn-sm" onclick="clearEnvSetting('AZURE_CONTENT_SAFETY_KEY','Content Safety key')" title="Remove the saved key and use Entra ID">Clear</button>
             </div>
         </div>
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">💾 Save Keys</button>
@@ -1054,8 +1101,35 @@ adapter = LangChainAgentAdapter(your_executor)</pre>
                 <label>Foundry Portal Upload</label>
                 <select id="set-foundry-upload" style="margin:0">
                     <option value="false">Disabled</option>
-                    <option value="true">Enabled — upload results to Foundry</option>
+                    <option value="true">Enabled — publish to Foundry Evaluations</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>Foundry Upload Method</label>
+                <select id="set-foundry-backend" style="margin:0">
+                    <option value="sdk">Evaluation SDK — recommended, returns portal link</option>
+                    <option value="rest">Legacy REST — compatibility only</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Metrics Published to Foundry</label>
+                <select id="set-foundry-metric-scope" style="margin:0">
+                    <option value="all">All ATTEST metrics — namespaced by backend</option>
+                    <option value="azure_only">Azure evaluator metrics only</option>
+                </select>
+                <div style="font-size:11px;color:#64748b;margin-top:5px">Foundry supports custom metrics. Names such as <code>score_azure_groundedness</code> and <code>score_deepeval_faithfulness</code> preserve provenance.</div>
+            </div>
+            <div class="form-group">
+                <label>Legacy REST Fallback</label>
+                <select id="set-foundry-rest-fallback" style="margin:0">
+                    <option value="false">Disabled — report SDK upload errors clearly</option>
+                    <option value="true">Enabled — retry using legacy REST</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column:1 / -1">
+                <label>Foundry Project Endpoint <span style="color:#64748b;font-size:11px">(optional when a Foundry agent is configured)</span></label>
+                <input id="set-foundry-endpoint" placeholder="https://your-resource.services.ai.azure.com/api/projects/your-project" style="margin:0">
+                <div style="font-size:11px;color:#64748b;margin-top:5px">The Evaluation SDK uses Azure CLI / Entra ID credentials and returns a direct <code>studio_url</code>.</div>
             </div>
             <div class="form-group">
                 <label>Evaluator Samples <span style="color:#64748b;font-size:11px">(run each N×, take median — reduces flakiness)</span></label>
@@ -1289,6 +1363,8 @@ async function loadAgentSetup() {
             el.innerHTML = agents.map(a => {
                 const typeBadge = a.type === 'foundry_prompt'
                     ? '<span style="background:#3b82f620;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Foundry</span>'
+                    : a.type === 'foundry_hosted'
+                    ? '<span style="background:#38bdf820;color:#38bdf8;padding:2px 8px;border-radius:4px;font-size:11px">Foundry Hosted</span>'
                     : a.type === 'a2a'
                     ? '<span style="background:#a78bfa20;color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:11px">A2A</span>'
                     : a.type === 'mcp'
@@ -1297,6 +1373,8 @@ async function loadAgentSetup() {
                 const endpoint = a.endpoint ? (a.endpoint.length > 60 ? a.endpoint.substring(0,60)+'...' : a.endpoint) : '—';
                 const detail = a.type === 'foundry_prompt'
                     ? `Agent: ${a.agent_name || '—'} v${a.agent_version || 'latest'}`
+                    : a.type === 'foundry_hosted'
+                    ? `Hosted agent: ${a.agent_name || '—'}`
                     : `Path: ${a.request_path || '/chat'}`;
                 return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #334155">
                     <div>
@@ -1344,6 +1422,9 @@ async function editAgent(name) {
             document.getElementById('s-endpoint').value = agent.endpoint || '';
             document.getElementById('s-agent-name').value = agent.agent_name || '';
             document.getElementById('s-agent-version').value = agent.agent_version || '';
+        } else if (agent.type === 'foundry_hosted') {
+            document.getElementById('s-endpoint').value = agent.endpoint || '';
+            document.getElementById('s-agent-name').value = agent.agent_name || '';
         } else if (agent.type === 'a2a') {
             document.getElementById('s-a2a-endpoint').value = agent.endpoint || '';
             document.getElementById('s-a2a-path').value = agent.request_path || '/';
@@ -1408,7 +1489,9 @@ function toggleAllInCard(selectAllCb, type) {
     const card = selectAllCb.closest('.section-card');
     const body = card.querySelector('.section-card-body');
     const checkboxes = body.querySelectorAll('input[type=checkbox][data-' + type + ']');
-    checkboxes.forEach(cb => { cb.checked = selectAllCb.checked; });
+    checkboxes.forEach(cb => {
+        if (!cb.disabled) cb.checked = selectAllCb.checked;
+    });
     // Also expand if selecting all
     if (selectAllCb.checked) {
         const header = card.querySelector('.section-card-header');
@@ -1417,6 +1500,54 @@ function toggleAllInCard(selectAllCb, type) {
             body.style.display = 'block';
         }
     }
+}
+
+function selectEvaluatorPreset(preset) {
+    const evaluators = Array.from(document.querySelectorAll('input[data-eval]'));
+    evaluators.forEach(cb => {
+        cb.checked = !cb.disabled && (
+            preset === 'all' || (preset === 'azure' && cb.dataset.backend === 'azure')
+        );
+    });
+
+    // Keep each card's master checkbox synchronized with its evaluator children.
+    document.querySelectorAll('.section-card').forEach(card => {
+        const children = Array.from(card.querySelectorAll('input[data-eval]'));
+        if (!children.length) return;
+        const master = card.querySelector('.section-card-header input[type=checkbox]');
+        if (master) {
+            master.checked = children.every(cb => cb.checked);
+            master.indeterminate = children.some(cb => cb.checked) && !master.checked;
+        }
+    });
+
+    const available = evaluators.filter(cb => !cb.disabled);
+    const selected = available.filter(cb => cb.checked).length;
+    const summary = document.getElementById('evaluatorPresetSummary');
+    if (summary) {
+        const label = preset === 'azure'
+            ? 'Azure / Foundry evaluators selected'
+            : preset === 'all'
+            ? 'All available evaluators selected'
+            : 'Evaluator selection cleared';
+        const unavailable = evaluators.length - available.length;
+        summary.textContent = `${label} (${selected}/${available.length} available` +
+            `${unavailable ? `; ${unavailable} unavailable` : ''}).`;
+    }
+}
+
+function syncEvaluatorCardMasters() {
+    document.querySelectorAll('.section-card').forEach(card => {
+        const children = Array.from(card.querySelectorAll('input[data-eval]'));
+        if (!children.length) return;
+        const available = children.filter(cb => !cb.disabled);
+        const master = card.querySelector('.section-card-header input[type=checkbox]');
+        if (master) {
+            master.disabled = available.length === 0;
+            master.checked = available.length > 0 && available.every(cb => cb.checked);
+            master.indeterminate = available.some(cb => cb.checked) && !master.checked;
+        }
+    });
 }
 
 function selectAllInSection(btn, type) {
@@ -1428,7 +1559,13 @@ function selectAllInSection(btn, type) {
 
 function toggleAgentFields() {
     const type = document.getElementById('s-type').value;
-    document.getElementById('foundryFields').style.display = type==='foundry_prompt' ? 'block' : 'none';
+    const isFoundry = type==='foundry_prompt' || type==='foundry_hosted';
+    document.getElementById('foundryFields').style.display = isFoundry ? 'block' : 'none';
+    // Hosted container agents have no version; hide the version field + show a hint.
+    const verGroup = document.getElementById('agentVersionGroup');
+    if (verGroup) verGroup.style.display = type==='foundry_hosted' ? 'none' : '';
+    const hostedHint = document.getElementById('foundryHostedHint');
+    if (hostedHint) hostedHint.style.display = type==='foundry_hosted' ? 'block' : 'none';
     document.getElementById('httpFields').style.display = type==='http' ? 'block' : 'none';
     const a2a = document.getElementById('a2aFields'); if (a2a) a2a.style.display = type==='a2a' ? 'block' : 'none';
     const mcp = document.getElementById('mcpFields'); if (mcp) mcp.style.display = type==='mcp' ? 'block' : 'none';
@@ -1458,6 +1595,9 @@ async function testConnection() {
         body.endpoint = document.getElementById('s-endpoint').value;
         body.agent_name = document.getElementById('s-agent-name').value;
         body.agent_version = document.getElementById('s-agent-version').value;
+    } else if (type==='foundry_hosted') {
+        body.endpoint = document.getElementById('s-endpoint').value;
+        body.agent_name = document.getElementById('s-agent-name').value;
     } else if (type==='a2a') {
         body.endpoint = document.getElementById('s-a2a-endpoint').value;
         body.request_path = document.getElementById('s-a2a-path').value || '/';
@@ -1486,6 +1626,9 @@ async function saveAgent() {
         body.endpoint = document.getElementById('s-endpoint').value;
         body.agent_name = document.getElementById('s-agent-name').value;
         body.agent_version = document.getElementById('s-agent-version').value;
+    } else if (type==='foundry_hosted') {
+        body.endpoint = document.getElementById('s-endpoint').value;
+        body.agent_name = document.getElementById('s-agent-name').value;
     } else if (type==='mcp') {
         const transport = document.getElementById('s-mcp-transport').value;
         body.transport = transport;
@@ -1543,6 +1686,18 @@ async function checkEvaluatorStatus() {
         const res = await fetch('/api/evaluators/status');
         const data = await res.json();
 
+        const setAvailability = (selector, available, reason) => {
+            document.querySelectorAll(selector).forEach(cb => {
+                cb.disabled = !available;
+                const label = cb.closest('label');
+                if (label) {
+                    label.style.opacity = available ? '' : '0.45';
+                    if (!available && reason) label.title = reason;
+                }
+                if (!available) cb.checked = false;
+            });
+        };
+
         // DeepEval status
         const deLabel = data.deepeval.installed
             ? (data.deepeval.configured ? '✅ ready' : '⚠️ needs OPENAI_API_KEY or Azure keys')
@@ -1553,17 +1708,54 @@ async function checkEvaluatorStatus() {
         const s2 = document.getElementById('deepeval-status2');
         if (s1) s1.innerHTML = deHtml;
         if (s2) s2.innerHTML = deHtml;
+        setAvailability(
+            'input[data-eval^="deepeval_"]',
+            data.deepeval.configured,
+            deLabel,
+        );
 
         // Azure eval status
-        const azLabel = data.azure_eval.installed
-            ? '✅ ready'
-            : '❌ not installed — pip install azure-ai-evaluation';
-        const azColor = data.azure_eval.installed ? '#22c55e' : '#ef4444';
+        const azLabel = !data.azure_eval.installed
+            ? '❌ not installed — pip install azure-ai-evaluation'
+            : data.azure_eval.quality_configured
+            ? '✅ model ready'
+            : '⚠️ needs Azure model endpoint + deployment';
+        const azColor = !data.azure_eval.installed
+            ? '#ef4444'
+            : data.azure_eval.quality_configured ? '#22c55e' : '#eab308';
         const azHtml = `<span style="color:${azColor}">${azLabel}</span>`;
+        const safetyLabel = !data.azure_eval.installed
+            ? '❌ not installed'
+            : data.azure_eval.safety_configured
+            ? '✅ project set · Entra credential required for hosted safety'
+            : '⚠️ needs Foundry project + Entra credential';
+        const safetyColor = data.azure_eval.safety_configured ? '#22c55e' : '#eab308';
         const a1 = document.getElementById('azure-eval-status');
         const a2 = document.getElementById('azure-eval-status2');
         if (a1) a1.innerHTML = azHtml;
-        if (a2) a2.innerHTML = azHtml;
+        if (a2) a2.innerHTML = `<span style="color:${safetyColor}">${safetyLabel}</span>`;
+        setAvailability(
+            'input[data-eval="groundedness"], input[data-eval="azure_relevance"], input[data-eval="coherence"], input[data-eval="fluency"], input[data-eval="similarity"], input[data-eval="task_adherence"], input[data-eval="intent_resolution"], input[data-eval="tool_call_accuracy"], input[data-eval="response_completeness"]',
+            data.azure_eval.quality_configured,
+            'Configure AZURE_API_BASE and Azure model credentials',
+        );
+        setAvailability(
+            'input[data-eval="violence"], input[data-eval="sexual"], input[data-eval="self_harm"], input[data-eval="hate_unfairness"]',
+            data.azure_eval.safety_configured,
+            'Configure a Foundry project endpoint and sign in with Entra ID',
+        );
+        setAvailability(
+            'input[data-eval="f1_score"], input[data-eval="bleu_score"]',
+            data.azure_eval.nlp_configured,
+            azLabel,
+        );
+        if (data.protected_code) {
+            setAvailability(
+                'input[data-eval="protected_code"]',
+                data.protected_code.configured,
+                data.protected_code.message,
+            );
+        }
 
         // RAGAS status
         if (data.ragas) {
@@ -1573,7 +1765,35 @@ async function checkEvaluatorStatus() {
             const rgColor = data.ragas.configured ? '#22c55e' : data.ragas.installed ? '#eab308' : '#ef4444';
             const rg = document.getElementById('ragas-eval-status');
             if (rg) rg.innerHTML = `<span style="color:${rgColor}">${rgLabel}</span>`;
+            setAvailability(
+                'input[data-eval^="ragas_"]',
+                data.ragas.configured,
+                rgLabel,
+            );
         }
+
+        setAvailability(
+            'input[data-eval="correctness"], input[data-eval="relevancy"], input[data-eval="hallucination"], input[data-eval="completeness"], input[data-eval="tone"]',
+            data.builtin.configured,
+            'Configure an Azure or OpenAI judge key first',
+        );
+
+        syncEvaluatorCardMasters();
+        const evaluators = Array.from(document.querySelectorAll('input[data-eval]'));
+        const available = evaluators.filter(cb => !cb.disabled).length;
+        const unavailable = evaluators.length - available;
+        const summary = document.getElementById('evaluatorPresetSummary');
+        if (summary) {
+            summary.textContent = `${available} evaluators available` +
+                `${unavailable ? `; ${unavailable} unavailable and excluded from presets.` : '.'}`;
+        }
+        const allBtn = document.getElementById('evalPresetAll');
+        const azureBtn = document.getElementById('evalPresetAzure');
+        if (allBtn) {
+            allBtn.disabled = false;
+            allBtn.textContent = 'Select All Available';
+        }
+        if (azureBtn) azureBtn.disabled = false;
     } catch(e) {}
 }
 
@@ -2455,6 +2675,17 @@ async function loadResults() {
         const data = await res.json();
         _cachedResults = data;
 
+        const foundryBanner = document.getElementById('foundryUploadBanner');
+        if (foundryBanner) {
+            if (data.foundry_url) {
+                foundryBanner.innerHTML = `<div class="alert alert-success" style="margin-bottom:12px">☁ <strong>Published to Foundry Evaluations</strong> via ${data.foundry_upload_backend || 'sdk'}. <a href="${data.foundry_url}" target="_blank" rel="noopener" style="color:#60a5fa">Open evaluation in Foundry ↗</a></div>`;
+            } else if (data.foundry_upload_status && data.foundry_upload_status !== 'uploaded') {
+                foundryBanner.innerHTML = `<div class="alert alert-error" style="margin-bottom:12px">⚠ Foundry publication status: <strong>${data.foundry_upload_status}</strong>. Check the run output and <code>reports/foundry/</code> artifacts.</div>`;
+            } else {
+                foundryBanner.innerHTML = '';
+            }
+        }
+
         // Demo banner — these are the bundled example results, not the user's.
         if (data.is_demo && runBanner && !statusData.is_running) {
             runBanner.innerHTML = '<div class="alert alert-info" style="margin-bottom:12px">📦 <strong>Example results</strong> — these are bundled demos so you can explore every test type. Run your own tests to replace them, or hide them in <a onclick="showPage(\'settings\')" style="color:#4f8cff;cursor:pointer">⚙️ Settings → Demo &amp; Example Data</a>.</div>';
@@ -2971,12 +3202,41 @@ function toggleKeyVisibility(inputId, btn) {
 async function saveSettings() {
     const el = document.getElementById('settingsAlert');
     const azureKey = document.getElementById('set-azure-key').value;
+    const azureBase = document.getElementById('set-azure-base').value.trim();
+    const azureDeployment = document.getElementById('set-azure-deployment').value.trim();
+    const azureEvalKey = document.getElementById('set-azure-eval-key').value;
     const openaiKey = document.getElementById('set-openai-key').value;
+    const contentSafetyEndpoint = document.getElementById('set-content-safety-endpoint').value.trim();
+    const contentSafetyKey = document.getElementById('set-content-safety-key').value;
     try {
         if(azureKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_API_KEY',key:azureKey})});
+        await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_API_BASE',key:azureBase,allow_empty:true})});
+        await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_DEPLOYMENT_NAME',key:azureDeployment,allow_empty:true})});
+        if(azureEvalKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_API_KEY_OPENAI',key:azureEvalKey})});
         if(openaiKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'OPENAI_API_KEY',key:openaiKey})});
-        el.innerHTML = '<div class="alert alert-success">✅ Keys saved to .env</div>';
+        await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_CONTENT_SAFETY_ENDPOINT',key:contentSafetyEndpoint,allow_empty:true})});
+        if(contentSafetyKey) await fetch('/api/settings/apikey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AZURE_CONTENT_SAFETY_KEY',key:contentSafetyKey})});
+        el.innerHTML = '<div class="alert alert-success">✅ Settings saved to .env</div>';
     } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function clearEnvSetting(name, label) {
+    if (!confirm(`Remove the saved ${label}?`)) return;
+    const el = document.getElementById('settingsAlert');
+    try {
+        const res = await fetch('/api/settings/apikey', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({name, key:'', allow_empty:true}),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unable to remove setting');
+        el.innerHTML = `<div class="alert alert-success">✅ ${label} removed</div>`;
+        await loadConfigDisplay();
+        await checkEvaluatorStatus();
+    } catch(e) {
+        el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
 }
 
 // ===== Demo / Example Data =====
@@ -3040,15 +3300,31 @@ async function loadConfigDisplay() {
         // Show masked key as placeholder; keep input EMPTY so the secret is
         // not held in the DOM and "save blank" means "keep existing key".
         const azInput = document.getElementById('set-azure-key');
+        const azBaseInput = document.getElementById('set-azure-base');
+        const azDeploymentInput = document.getElementById('set-azure-deployment');
+        const azEvalKeyInput = document.getElementById('set-azure-eval-key');
         const oaInput = document.getElementById('set-openai-key');
+        const csEndpointInput = document.getElementById('set-content-safety-endpoint');
+        const csKeyInput = document.getElementById('set-content-safety-key');
         azInput.value = '';
+        azBaseInput.value = keys.azure_api_base || '';
+        azDeploymentInput.value = keys.azure_deployment || '';
+        azEvalKeyInput.value = '';
         oaInput.value = '';
+        csEndpointInput.value = keys.content_safety_endpoint || '';
+        csKeyInput.value = '';
         azInput.placeholder = keys.has_azure_key
             ? 'Key set: ' + keys.azure_api_key_masked + ' — paste a new key to replace'
             : 'Paste your Azure API key here';
+        azEvalKeyInput.placeholder = keys.has_azure_eval_key
+            ? 'Key set: ' + keys.azure_eval_key_masked + ' — paste a new key to replace'
+            : 'Paste evaluator-specific Azure key, or use az login';
         oaInput.placeholder = keys.has_openai_key
             ? 'Key set: ' + keys.openai_api_key_masked + ' — paste a new key to replace'
             : 'sk-... (optional — skip if using Azure)';
+        csKeyInput.placeholder = keys.has_content_safety_key
+            ? 'Key set: ' + keys.content_safety_key_masked + ' — paste a new key to replace'
+            : 'Paste Content Safety key, or use az login';
 
         // Show key status banner
         const statusEl = document.getElementById('settingsKeyStatus');
@@ -3271,6 +3547,10 @@ async function loadExecutionConfig() {
         document.getElementById('set-rate-limit').value = data.rate_limit || 0;
         document.getElementById('set-max-cost').value = data.max_eval_cost_per_run || 5;
         document.getElementById('set-foundry-upload').value = String(data.foundry_upload);
+        document.getElementById('set-foundry-backend').value = data.foundry_upload_backend || 'sdk';
+        document.getElementById('set-foundry-metric-scope').value = data.foundry_metric_scope || 'all';
+        document.getElementById('set-foundry-rest-fallback').value = String(data.foundry_rest_fallback || false);
+        document.getElementById('set-foundry-endpoint').value = data.foundry_endpoint || '';
         const samplesEl = document.getElementById('set-eval-samples');
         if (samplesEl) samplesEl.value = data.eval_samples || 1;
 
@@ -3291,6 +3571,10 @@ async function saveExecutionSettings() {
         rate_limit: parseFloat(document.getElementById('set-rate-limit').value) || 0,
         max_eval_cost_per_run: parseFloat(document.getElementById('set-max-cost').value) || 5,
         foundry_upload: document.getElementById('set-foundry-upload').value === 'true',
+        foundry_upload_backend: document.getElementById('set-foundry-backend').value,
+        foundry_metric_scope: document.getElementById('set-foundry-metric-scope').value,
+        foundry_rest_fallback: document.getElementById('set-foundry-rest-fallback').value === 'true',
+        foundry_endpoint: document.getElementById('set-foundry-endpoint').value.trim(),
         eval_samples: parseInt(document.getElementById('set-eval-samples').value) || 1,
     };
     try {

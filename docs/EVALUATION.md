@@ -1,8 +1,15 @@
-# ATTEST — Evaluation System
+---
+title: ATTEST Evaluation System
+description: Configure evaluator backends and publish ATTEST evaluation results to Microsoft Foundry.
+ms.date: 2026-08-10
+ms.topic: reference
+---
 
 ## Overview
 
-ATTEST provides 36 evaluators across 4 backends. Evaluators use LLM-as-judge to score agent responses on a 0.0-1.0 scale.
+ATTEST provides 37 evaluators across 4 backends. Evaluators score agent
+responses on a normalized 0.0-1.0 scale. Some use LLM judges, while safety and
+NLP evaluators use hosted services or deterministic local calculations.
 
 ### Which evaluator should I use?
 
@@ -48,7 +55,7 @@ Research-backed metrics from the DeepEval framework. Install: `pip install deepe
 | `deepeval_contextual_precision` | RAG | Context is precise/focused |
 | `deepeval_tool_correctness` | Agent | Correct tools were used |
 
-### Azure AI SDK (15 metrics)
+### Azure AI SDK and Content Safety (16 metrics)
 Microsoft's production evaluation SDK. Install: `pip install azure-ai-evaluation`
 
 | Name | Category | What It Checks |
@@ -66,6 +73,7 @@ Microsoft's production evaluation SDK. Install: `pip install azure-ai-evaluation
 | `sexual` | Safety | Sexual content (free) |
 | `self_harm` | Safety | Self-harm content (free) |
 | `hate_unfairness` | Safety | Hate/bias detection (free) |
+| `protected_code` | Safety/IP | Detects generated code matching known GitHub repository code (preview) |
 | `f1_score` | NLP | F1 score (local, free) |
 | `bleu_score` | NLP | BLEU score (local, free) |
 
@@ -102,6 +110,54 @@ evaluation:
 This trades extra LLM cost for stability — pair it with a small N (3–5) on the tests that
 gate your CI. Also configurable in the dashboard under **Settings → Execution & Cost**.
 
+## Publish results to Microsoft Foundry
+
+Set `reporting.foundry_upload` to publish ATTEST runs to the Foundry portal's
+**Evaluations** tab. The default `sdk` backend uses the official
+`azure.ai.evaluation.evaluate()` API and returns a direct `studio_url`.
+
+```yaml
+reporting:
+  output_dir: reports
+  foundry_upload: true
+  foundry_upload_backend: sdk
+  foundry_metric_scope: all
+  foundry_rest_fallback: false
+  foundry_endpoint: "https://resource.services.ai.azure.com/api/projects/project"
+```
+
+Run normally or enable publication for one invocation:
+
+```powershell
+attest run --upload-to-foundry
+```
+
+ATTEST writes an SDK input dataset and local evaluation result under
+`reports/foundry/`. The dataset contains each test's query, response, status,
+agent, suite, evaluator scores, assertion pass rate, latency, token usage, and
+diagnostic details. A deterministic SDK evaluator replays those already
+computed metrics into Foundry, which avoids running LLM judges a second time.
+
+The default `all` metric scope is recommended because Foundry accepts custom
+evaluator outputs. ATTEST namespaces score metrics by backend, for example
+`score_azure_groundedness`, `score_deepeval_faithfulness`,
+`score_ragas_context_precision`, and `score_builtin_correctness`. The namespace
+keeps metric provenance explicit and prevents an external evaluator from being
+mistaken for a native Azure evaluator. Organizations that require a strict
+Azure-only portal can set `foundry_metric_scope: azure_only`; operational
+status and performance fields remain available, while external evaluator and
+assertion metrics are omitted.
+
+The SDK publication path requires Azure CLI or Microsoft Entra ID credentials
+with access to the Foundry project. The endpoint can be omitted when a
+`foundry_prompt` or `foundry_hosted` agent already provides the project
+endpoint.
+
+> [!WARNING]
+> The `rest` backend is retained for compatibility, but its endpoint contract
+> is not the recommended publication mechanism. REST fallback is opt-in through
+> `foundry_rest_fallback: true`; SDK failures remain visible by default.
+
 ## Plugin Architecture
 
 All evaluators implement `BaseEvaluator`:
@@ -136,9 +192,32 @@ registry.register("my_metric", MyEvaluator)
 
 Plugins auto-register at startup if their package is installed:
 - DeepEval: `pip install deepeval` → 12 metrics available
-- Azure: `pip install azure-ai-evaluation` → 15 metrics available
+- Azure: `pip install azure-ai-evaluation` → 16 metrics available
 - RAGAS: `pip install ragas langchain-openai` → 4 metrics available
-- If not installed, silently skipped — no errors
+- If not installed, the optional backend is silently skipped
+
+### Protected Code Match configuration
+
+`protected_code` calls the Azure AI Content Safety Protected Material for Code
+preview API. It scans generated code against Microsoft's index of known GitHub
+repository code and returns source URLs plus reported license metadata.
+
+```dotenv
+AZURE_CONTENT_SAFETY_ENDPOINT=https://your-resource.cognitiveservices.azure.com
+AZURE_CONTENT_SAFETY_KEY=your-content-safety-key
+```
+
+The key can be omitted when Microsoft Entra ID authentication is available.
+These values can also be configured from **Dashboard > Settings > API Keys**.
+
+A detected match fails the evaluator and receives a normalized score of `0.0`;
+no detected match passes with `1.0`. A match is a review signal, not a legal
+conclusion. Review the returned source URLs and licenses before reuse.
+
+> [!CAUTION]
+> Microsoft documents that the protected-code index is current through April
+> 6, 2023. A no-match result does not prove code originality, and code added to
+> GitHub after that date might not be detected.
 
 ## Authentication for Evaluators
 
@@ -153,8 +232,9 @@ All evaluator backends support **keyless auth via Azure Entra ID** as well as AP
 ```bash
 az login
 pip install azure-identity
-# Set only endpoint in .env, no keys:
+# Set non-secret model values in .env, no keys:
 AZURE_API_BASE=https://your-resource.openai.azure.com
+AZURE_DEPLOYMENT_NAME=gpt-4.1-mini
 ```
 
 ### Per-backend details
@@ -163,7 +243,12 @@ AZURE_API_BASE=https://your-resource.openai.azure.com
 
 **DeepEval evaluators (12)**: Auto-detect credentials. If `OPENAI_API_KEY` is set, use it natively. Otherwise create Azure wrapper (key or Entra ID).
 
-**Azure AI evaluators (15)**: Auto-build `model_config` from env vars. Support both API key and Entra ID token provider.
+**Azure AI and Content Safety evaluators (16)** use family-specific authentication:
+
+- Quality and agent evaluators require an Azure OpenAI endpoint and deployment; they support an API key or Entra ID
+- Hosted safety evaluators (`violence`, `sexual`, `self_harm`, `hate_unfairness`) require a Foundry project and Entra `TokenCredential`
+- `protected_code` requires a Content Safety endpoint and supports a Content Safety key or Entra ID
+- Local NLP evaluators (`f1_score`, `bleu_score`) require no credentials
 
 **RAGAS evaluators (4)**: Wrap RAGAS metrics with your configured LLM judge and embeddings (via `langchain-openai`). Support both API key and Entra ID.
 

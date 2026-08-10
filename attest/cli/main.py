@@ -224,6 +224,11 @@ def run(
         "--trace",
         help="Emit OpenTelemetry spans for the run (uses OTEL_EXPORTER_OTLP_ENDPOINT, else console).",
     ),
+    upload_to_foundry: bool = typer.Option(
+        False,
+        "--upload-to-foundry",
+        help="Upload the run's results to the Azure Foundry portal (overrides reporting.foundry_upload).",
+    ),
 ):
     """Run all test scenarios.
 
@@ -237,6 +242,7 @@ def run(
         attest run --tag critical          — Run tagged tests only
         attest run --parallel 5            — Run 5 tests concurrently
         attest run --profile staging       — Run with staging config
+        attest run --upload-to-foundry     — Push results to the Foundry portal
     """
     from attest.cli.run_cmd import run_tests
 
@@ -253,6 +259,7 @@ def run(
         profile=profile,
         fail_on_regression=fail_on_regression,
         enforce_gates=gate,
+        upload_to_foundry=upload_to_foundry,
     ))
 
 

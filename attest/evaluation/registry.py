@@ -16,7 +16,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 from attest.evaluation.interface import BaseEvaluator
 from attest.evaluation.builtin.correctness import CorrectnessEvaluator
@@ -33,8 +33,17 @@ class EvaluatorRegistry:
     Starts with built-in evaluators; plugins add more at runtime.
     """
 
-    def __init__(self, model: str = "openai/gpt-4.1-mini"):
+    def __init__(
+        self,
+        model: str = "openai/gpt-4.1-mini",
+        azure_ai_project: Optional[str] = None,
+        azure_model_config: Optional[Dict[str, Any]] = None,
+        azure_credential: Optional[Any] = None,
+    ):
         self._model = model
+        self._azure_ai_project = azure_ai_project
+        self._azure_model_config = azure_model_config or {}
+        self._azure_credential = azure_credential
 
         # Built-in evaluators — always available
         self._registry: Dict[str, Type[BaseEvaluator]] = {
@@ -100,6 +109,15 @@ class EvaluatorRegistry:
 
         # Build constructor args
         init_kwargs = {"model": self._model}
+        if (
+            cls.__module__.startswith("attest.plugins.azure_eval")
+        ):
+            if self._azure_ai_project:
+                init_kwargs["azure_ai_project"] = self._azure_ai_project
+            if self._azure_model_config:
+                init_kwargs["model_config"] = self._azure_model_config
+            if self._azure_credential is not None:
+                init_kwargs["credential"] = self._azure_credential
         if threshold is not None:
             init_kwargs["threshold"] = threshold
         init_kwargs.update(kwargs)

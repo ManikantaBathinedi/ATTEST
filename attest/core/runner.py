@@ -20,10 +20,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 import uuid
 from datetime import datetime
-from typing import Callable, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -65,8 +67,59 @@ class TestRunner:
         registry: Optional[EvaluatorRegistry] = None,
     ):
         self._config = config
+        azure_ai_project = (
+            config.evaluation.azure.project
+            or config.reporting.foundry_endpoint
+        )
+        if not azure_ai_project:
+            azure_ai_project = next(
+                (
+                    agent.endpoint
+                    for agent in config.agents.values()
+                    if agent.type in ("foundry_prompt", "foundry_hosted", "foundry_container")
+                    and agent.endpoint
+                ),
+                None,
+            )
+        azure_model_config = dict(config.evaluation.azure.model_config_dict)
+        azure_endpoint = (
+            azure_model_config.get("azure_endpoint")
+            or os.environ.get("AZURE_API_BASE")
+        )
+        deployment = (
+            azure_model_config.get("azure_deployment")
+            or self._azure_deployment_name(config.evaluation.judge.model)
+        )
+        if azure_endpoint and deployment:
+            azure_model_config.update(
+                {
+                    "azure_endpoint": azure_endpoint,
+                    "azure_deployment": deployment,
+                    "api_version": (
+                        azure_model_config.get("api_version")
+                        or os.environ.get("AZURE_API_VERSION", "2025-04-01-preview")
+                    ),
+                }
+            )
+            api_key = (
+                azure_model_config.get("api_key")
+                or os.environ.get("AZURE_API_KEY_OPENAI")
+                or os.environ.get("AZURE_API_KEY")
+            )
+            if api_key:
+                azure_model_config["api_key"] = api_key
+        else:
+            azure_model_config = {}
+        azure_credential = None
+        if azure_ai_project or (azure_model_config and "api_key" not in azure_model_config):
+            from attest.utils.azure_client import get_azure_credential
+
+            azure_credential = get_azure_credential()
         self._registry = registry or EvaluatorRegistry(
-            model=config.evaluation.judge.model
+            model=config.evaluation.judge.model,
+            azure_ai_project=azure_ai_project,
+            azure_model_config=azure_model_config,
+            azure_credential=azure_credential,
         )
         self._adapters: Dict[str, BaseAgentAdapter] = {}
         self._cache = ResponseCache() if config.evaluation.cost.cache_responses else None
@@ -75,6 +128,13 @@ class TestRunner:
             if config.evaluation.cost.rate_limit > 0
             else None
         )
+
+    @staticmethod
+    def _azure_deployment_name(model: str) -> str:
+        """Extract an Azure deployment name from an evaluator model identifier."""
+        if model.startswith("azure/"):
+            return model[len("azure/"):]
+        return os.environ.get("AZURE_DEPLOYMENT_NAME", "")
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -186,7 +246,10 @@ class TestRunner:
 
         # Upload to Foundry portal if configured
         if self._config.reporting.foundry_upload:
-            await self._upload_to_foundry(summary, verbose)
+            upload_result = await self._upload_to_foundry(summary, verbose)
+            summary.foundry_upload_status = upload_result.get("status")
+            summary.foundry_upload_backend = upload_result.get("backend")
+            summary.foundry_url = upload_result.get("studio_url")
 
         return summary
 
@@ -620,6 +683,7 @@ class TestRunner:
                         reason=eval_result.reason,
                         backend=eval_result.metadata.get("backend", "builtin"),
                         raw_score=eval_result.raw_score,
+                        metadata=eval_result.metadata,
                     )
                 )
             except EvaluationError as e:
@@ -630,6 +694,7 @@ class TestRunner:
                         passed=False,
                         threshold=evaluator.threshold,
                         reason=f"Evaluation error: {e}",
+                        backend=self._evaluator_backend(evaluator),
                     )
                 )
             except Exception as e:
@@ -640,6 +705,7 @@ class TestRunner:
                         passed=False,
                         threshold=evaluator.threshold,
                         reason=f"Unexpected error: {e}",
+                        backend=self._evaluator_backend(evaluator),
                     )
                 )
 
@@ -674,6 +740,7 @@ class TestRunner:
                         reason=eval_result.reason,
                         backend=eval_result.metadata.get("backend", "builtin"),
                         raw_score=eval_result.raw_score,
+                        metadata=eval_result.metadata,
                     )
                 )
             except Exception as e:
@@ -681,10 +748,25 @@ class TestRunner:
                     EvalScore(
                         name=evaluator.name, score=0.0, passed=False,
                         threshold=evaluator.threshold, reason=f"Error: {e}",
+                        backend=self._evaluator_backend(evaluator),
                     )
                 )
 
         return scores
+
+    @staticmethod
+    def _evaluator_backend(evaluator) -> str:
+        """Infer evaluator provenance when execution fails before metadata exists."""
+        module = evaluator.__class__.__module__.lower()
+        name = evaluator.__class__.__name__.lower()
+        identity = f"{module}.{name}"
+        if "azure_eval" in identity or name.startswith("azure"):
+            return "azure"
+        if "deepeval" in identity:
+            return "deepeval"
+        if "ragas" in identity:
+            return "ragas"
+        return "builtin"
 
     async def _evaluate_with_samples(self, evaluator, eval_input):
         """Run an evaluator once, or N times and aggregate (median) if
@@ -834,36 +916,109 @@ class TestRunner:
     # Foundry portal upload
     # ------------------------------------------------------------------
 
-    async def _upload_to_foundry(self, summary: RunSummary, verbose: bool = True) -> None:
-        """Upload test results to Azure Foundry portal."""
-        # Find a Foundry agent endpoint to use for upload
-        foundry_endpoint = None
-        for agent_config in self._config.agents.values():
-            if agent_config.type == "foundry_prompt" and agent_config.endpoint:
-                foundry_endpoint = agent_config.endpoint
-                break
+    async def _upload_to_foundry(
+        self,
+        summary: RunSummary,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """Upload results through the SDK, with optional legacy REST fallback."""
+        # Explicit endpoint wins; otherwise use the first Foundry agent's endpoint.
+        foundry_endpoint = self._config.reporting.foundry_endpoint
+        if not foundry_endpoint:
+            for agent_config in self._config.agents.values():
+                if (
+                    agent_config.type in ("foundry_prompt", "foundry_hosted", "foundry_container")
+                    and agent_config.endpoint
+                ):
+                    foundry_endpoint = agent_config.endpoint
+                    break
 
         if not foundry_endpoint:
+            result = {
+                "status": "skipped",
+                "backend": self._config.reporting.foundry_upload_backend,
+                "detail": "No Foundry project endpoint configured",
+            }
             if verbose:
-                console.print("  [yellow]⚠ Foundry upload skipped — no Foundry agent endpoint configured[/yellow]")
-            return
+                console.print(
+                    "  [yellow]⚠ Foundry upload skipped — no Foundry agent endpoint configured. "
+                    "Set reporting.foundry_endpoint in attest.yaml.[/yellow]"
+                )
+            return result
 
+        backend = self._config.reporting.foundry_upload_backend
         try:
-            from attest.adapters.foundry.result_uploader import FoundryResultUploader
+            if backend == "rest":
+                result = await self._upload_to_foundry_rest(summary, foundry_endpoint)
+            else:
+                from attest.adapters.foundry.sdk_result_uploader import (
+                    FoundrySdkResultUploader,
+                )
 
-            uploader = FoundryResultUploader(endpoint=foundry_endpoint)
-            result = await uploader.upload_run(summary)
-            await uploader.close()
-
-            if verbose:
-                status = result.get("status", "unknown")
-                if status in ("uploaded", "success"):
-                    console.print(f"  [green]☁ Results uploaded to Foundry portal[/green]")
-                else:
-                    console.print(f"  [yellow]⚠ Foundry upload: {status}[/yellow]")
+                uploader = FoundrySdkResultUploader(
+                    endpoint=foundry_endpoint,
+                    output_dir=Path(self._config.reporting.output_dir) / "foundry",
+                    metric_scope=self._config.reporting.foundry_metric_scope,
+                )
+                result = await uploader.upload_run(summary)
         except Exception as e:
-            if verbose:
-                console.print(f"  [yellow]⚠ Foundry upload failed: {e}[/yellow]")
+            if backend == "sdk" and self._config.reporting.foundry_rest_fallback:
+                if verbose:
+                    console.print(
+                        f"  [yellow]⚠ Foundry SDK upload failed: {e}. "
+                        "Trying configured REST fallback...[/yellow]"
+                    )
+                try:
+                    result = await self._upload_to_foundry_rest(
+                        summary, foundry_endpoint
+                    )
+                except Exception as rest_error:
+                    result = {
+                        "status": "failed",
+                        "backend": "rest",
+                        "detail": (
+                            f"SDK upload failed: {e}; REST fallback failed: "
+                            f"{rest_error}"
+                        ),
+                    }
+            else:
+                result = {
+                    "status": "failed",
+                    "backend": backend,
+                    "detail": str(e),
+                }
+
+        if verbose:
+            status = result.get("status", "unknown")
+            studio_url = result.get("studio_url")
+            if status in ("uploaded", "success") and studio_url:
+                console.print("  [green]☁ Results uploaded to Foundry portal[/green]")
+                console.print(
+                    f"  [cyan]Evaluation:[/cyan] [link={studio_url}]{studio_url}[/link]"
+                )
+            elif status in ("uploaded", "success"):
+                console.print(
+                    "  [yellow]⚠ Upload reported success but returned no Foundry portal URL[/yellow]"
+                )
+            else:
+                detail = result.get("detail", "")
+                console.print(f"  [yellow]⚠ Foundry upload {status}: {detail}[/yellow]")
+
+        return result
+
+    @staticmethod
+    async def _upload_to_foundry_rest(
+        summary: RunSummary,
+        endpoint: str,
+    ) -> Dict[str, Any]:
+        """Use the legacy, explicitly configured REST upload implementation."""
+        from attest.adapters.foundry.result_uploader import FoundryResultUploader
+
+        uploader = FoundryResultUploader(endpoint=endpoint)
+        try:
+            return await uploader.upload_run(summary)
+        finally:
+            await uploader.close()
 
     # ------------------------------------------------------------------
     # Console output

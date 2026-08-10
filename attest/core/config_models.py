@@ -29,7 +29,7 @@ Example attest.yaml:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -210,6 +210,16 @@ class ReportingConfig(BaseModel):
     formats: List[str] = Field(default_factory=lambda: ["html", "json"])
     compare_with_previous: bool = True
     foundry_upload: bool = False  # Upload results to Foundry portal
+    # Explicit Foundry project endpoint for uploads. If unset, ATTEST uses the
+    # endpoint of the first configured Foundry agent.
+    foundry_endpoint: Optional[str] = None
+    # SDK uses azure.ai.evaluation.evaluate() and returns a Foundry studio URL.
+    # REST is retained only for explicitly requested legacy compatibility.
+    foundry_upload_backend: Literal["sdk", "rest"] = "sdk"
+    foundry_rest_fallback: bool = False
+    # Foundry supports custom evaluator metrics, so publish all ATTEST metrics
+    # by default. Use azure_only for organizations with strict portal policies.
+    foundry_metric_scope: Literal["all", "azure_only"] = "all"
 
 
 # ---------------------------------------------------------------------------

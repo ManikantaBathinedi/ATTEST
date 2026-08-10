@@ -159,6 +159,11 @@ reporting:
   - json                                               # Machine-readable results
   - html                                               # Visual report (open in browser)
   compare_with_previous: true                          # Show what changed since last run
+  foundry_upload: false                                # Publish under Foundry Portal > Evaluations
+  foundry_upload_backend: sdk                          # Official azure-ai-evaluation SDK
+  foundry_metric_scope: all                            # all (namespaced) or azure_only
+  foundry_rest_fallback: false                         # Legacy REST fallback is explicit
+  # foundry_endpoint: "https://resource.services.ai.azure.com/api/projects/project"
 
 
 # ============================================================

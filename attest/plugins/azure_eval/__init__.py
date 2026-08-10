@@ -10,7 +10,8 @@ Evaluator categories:
     FREE (no LLM cost):
         f1_score, bleu_score         → Run locally, zero API calls
         violence, sexual, self_harm,
-        hate_unfairness              → Azure Content Safety (free with Foundry)
+        hate_unfairness              → Foundry-hosted safety models
+        protected_code               → Content Safety protected-code API (preview)
 
     LLM token cost:
         groundedness, azure_relevance,
@@ -42,9 +43,11 @@ class AzureEvalPlugin:
         self,
         model_config: Optional[Dict[str, str]] = None,
         azure_ai_project: Optional[Any] = None,
+        credential: Optional[Any] = None,
     ):
         self.model_config = model_config or {}
         self.azure_ai_project = azure_ai_project
+        self.credential = credential
         self._sdk_available = self._check_sdk()
 
     def _check_sdk(self) -> bool:
@@ -67,21 +70,22 @@ class AzureEvalPlugin:
             return 0
 
         from attest.plugins.azure_eval.evaluators import (
-            AzureGroundednessEvaluator,
-            AzureRelevanceEvaluator,
+            AzureBleuScoreEvaluator,
             AzureCoherenceEvaluator,
+            AzureF1ScoreEvaluator,
             AzureFluencyEvaluator,
+            AzureGroundednessEvaluator,
+            AzureHateUnfairnessEvaluator,
+            AzureIntentResolutionEvaluator,
+            AzureProtectedCodeEvaluator,
+            AzureRelevanceEvaluator,
+            AzureResponseCompletenessEvaluator,
+            AzureSelfHarmEvaluator,
+            AzureSexualEvaluator,
             AzureSimilarityEvaluator,
             AzureTaskAdherenceEvaluator,
-            AzureIntentResolutionEvaluator,
             AzureToolCallAccuracyEvaluator,
-            AzureResponseCompletenessEvaluator,
             AzureViolenceEvaluator,
-            AzureSexualEvaluator,
-            AzureSelfHarmEvaluator,
-            AzureHateUnfairnessEvaluator,
-            AzureF1ScoreEvaluator,
-            AzureBleuScoreEvaluator,
         )
 
         # Map: registry name → (class, needs_model_config, needs_project)
@@ -102,6 +106,7 @@ class AzureEvalPlugin:
             "sexual":                (AzureSexualEvaluator, False, True),
             "self_harm":             (AzureSelfHarmEvaluator, False, True),
             "hate_unfairness":       (AzureHateUnfairnessEvaluator, False, True),
+            "protected_code":        (AzureProtectedCodeEvaluator, False, False),
             # NLP (100% FREE, local)
             "f1_score":              (AzureF1ScoreEvaluator, False, False),
             "bleu_score":            (AzureBleuScoreEvaluator, False, False),
@@ -115,6 +120,8 @@ class AzureEvalPlugin:
                 kwargs["model_config"] = self.model_config
             if needs_project:
                 kwargs["azure_ai_project"] = self.azure_ai_project
+            if self.credential is not None and (needs_model or needs_project):
+                kwargs["credential"] = self.credential
 
             # Register a wrapper that passes config at creation time
             _cls = cls
@@ -143,7 +150,7 @@ class AzureEvalPlugin:
         "task_adherence", "intent_resolution", "tool_call_accuracy", "response_completeness",
     ]
     SAFETY_EVALUATORS = [
-        "violence", "sexual", "self_harm", "hate_unfairness",
+        "violence", "sexual", "self_harm", "hate_unfairness", "protected_code",
     ]
     NLP_EVALUATORS = [
         "f1_score", "bleu_score",

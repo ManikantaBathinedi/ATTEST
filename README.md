@@ -1,3 +1,8 @@
+---
+title: ATTEST
+description: Agent Testing and Trust Evaluation Suite for AI agents, multi-agent systems, A2A, and MCP.
+---
+
 <p align="center">
   <strong>ATTEST</strong><br>
   <em>Agent Testing & Trust Evaluation Suite</em>
@@ -49,7 +54,7 @@ Testing AI agents is hard. Responses are non-deterministic, tool calls are invis
 
 - **Write tests in YAML** — no code needed for common scenarios
 - **34 deterministic assertions** — content, tool calls, JSON structure, routing, latency, TTFT, throughput, cost, PII, language, semantic similarity, golden baselines
-- **36 LLM evaluators** — score relevancy, correctness, bias, toxicity, groundedness across 4 backends (built-in, DeepEval, Azure AI Evaluation, RAGAS)
+- **37 evaluators** — score quality, safety, groundedness, protected-code matches, and more across 4 backends (built-in, DeepEval, Azure AI and Content Safety, RAGAS)
 - **Multi-turn conversations** — test booking flows, multi-step tasks, context retention
 - **User simulation** — LLM plays realistic personas to find edge cases humans miss
 - **Security red teaming** — 30 attacks across 7 categories (prompt injection, jailbreak, PII extraction)
@@ -72,7 +77,7 @@ CI-ready package.
 | Capability | ATTEST | LangSmith | DeepEval | Promptfoo | Ragas |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Deterministic assertions (tools, JSON, routing, latency) | ✅ 34 | ⚠️ basic | ⚠️ limited | ✅ | ❌ |
-| LLM-as-judge evaluators | ✅ 36 | ✅ | ✅ | ✅ | ✅ |
+| Evaluators | ✅ 37 | ✅ | ✅ | ✅ | ✅ |
 | Multiple eval backends in one tool | ✅ 4 | ❌ | ❌ | ⚠️ | ❌ |
 | RAG evaluation (faithfulness, context recall) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ |
 | Multi-turn conversation testing | ✅ | ✅ | ⚠️ | ⚠️ | ❌ |
@@ -168,6 +173,23 @@ agents:
     agent_version: "1"
 ```
 
+> **Two Azure Foundry agent types are supported.** Use `foundry_prompt` for
+> prompt-flow agents (called via the Responses API with an `agent_reference`).
+> Use `foundry_hosted` for hosted **container** agents (called via the agent's
+> own endpoint `/agents/{name}/endpoint/protocols/openai/responses`). Hosted
+> agents don't use a version:
+>
+> ```yaml
+> agents:
+>   my_hosted_agent:
+>     type: foundry_hosted
+>     endpoint: "https://your-resource.services.ai.azure.com/api/projects/your-project"
+>     agent_name: "My-Hosted-Agent"
+> ```
+>
+> Not sure which one you have? Leave it as `foundry_prompt` — ATTEST detects a
+> hosted agent at runtime and automatically switches to the hosted endpoint.
+
 **.env:**
 ```
 AZURE_API_KEY=your-key-here
@@ -243,13 +265,13 @@ Or check `reports/results.json` directly.
 
 ## Evaluators
 
-ATTEST ships with **36 evaluators** across 4 backends. Mix and match in YAML:
+ATTEST ships with **37 evaluators** across 4 backends. Mix and match in YAML:
 
 | Backend | Count | Metrics |
 |---------|-------|---------|
 | **Built-in** | 5 | correctness, relevancy, hallucination, completeness, tone |
 | **DeepEval** | 12 | bias, toxicity, faithfulness, contextual relevancy/recall/precision, tool correctness, summarization, and more |
-| **Azure AI SDK** | 15 | groundedness, coherence, fluency, violence, self-harm, hate/unfairness, f1 score, BLEU, and more |
+| **Azure AI SDK** | 16 | groundedness, coherence, fluency, protected code, violence, self-harm, hate/unfairness, F1 score, BLEU, and more |
 | **RAGAS** | 4 | faithfulness, answer relevancy, context precision, context recall |
 
 ```yaml
@@ -326,7 +348,7 @@ attest/
 ├── perf/               # Agent performance stats (latency/TTFT/throughput percentiles)
 ├── plugins/
 │   ├── deepeval_plugin/  # 12 DeepEval evaluators
-│   ├── azure_eval/       # 15 Azure AI SDK evaluators
+│   ├── azure_eval/       # 16 Azure AI and Content Safety evaluators
 │   └── ragas_plugin/     # 4 RAGAS RAG evaluators
 ├── reporting/          # HTML, JUnit XML, CSV, Markdown report generators
 ├── security/           # Red team attack generator (30 patterns)
@@ -341,7 +363,7 @@ attest/
 |-------|---------------|
 | [Getting Started](docs/GETTING_STARTED.md) | Full setup walkthrough — install, auth, first test run |
 | [Test Creation Guide](docs/TEST_CREATION_GUIDE.md) | All 9 test types with YAML, CSV, JSONL, and Python examples |
-| [Evaluation](docs/EVALUATION.md) | 36 evaluators, 4 backends, auth options, custom evaluators |
+| [Evaluation](docs/EVALUATION.md) | 37 evaluators, 4 backends, auth options, custom evaluators |
 | [Dashboard & API](docs/DASHBOARD.md) | Dashboard pages, REST API reference |
 
 ---

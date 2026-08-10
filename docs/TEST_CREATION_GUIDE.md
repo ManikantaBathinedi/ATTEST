@@ -1,4 +1,11 @@
-# ATTEST — Test Types & Creation Guide
+---
+title: ATTEST Test Types and Creation Guide
+description: Create ATTEST scenarios with assertions and evaluator backends through YAML, files, Python, or the dashboard.
+ms.date: 2026-08-10
+ms.topic: tutorial
+---
+
+## Test Types and Creation Guide
 
 Everything you need to know about creating tests in ATTEST. Covers all test types, all creation methods, and real-world examples.
 
@@ -567,7 +574,7 @@ in-process graph adapter such as LangGraph/CrewAI/AutoGen). See
 
 ---
 
-## All 36 Evaluators Reference
+## All 37 Evaluators Reference
 
 ### Built-in (5) — Always available, uses your configured LLM judge
 `correctness` · `relevancy` · `hallucination` · `completeness` · `tone`
@@ -581,12 +588,12 @@ in-process graph adapter such as LangGraph/CrewAI/AutoGen). See
 
 **Agent**: `deepeval_tool_correctness`
 
-### Azure AI (15) — `pip install azure-ai-evaluation`
+### Azure AI and Content Safety (16) — `pip install azure-ai-evaluation`
 **Quality**: `groundedness` · `azure_relevance` · `coherence` · `fluency` · `similarity`
 
 **Agent**: `task_adherence` · `intent_resolution` · `tool_call_accuracy` · `response_completeness`
 
-**Safety**: `violence` · `sexual` · `self_harm` · `hate_unfairness`
+**Safety/IP**: `violence` · `sexual` · `self_harm` · `hate_unfairness` · `protected_code`
 
 **NLP**: `f1_score` · `bleu_score`
 

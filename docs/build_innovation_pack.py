@@ -75,7 +75,7 @@ SOLUTION = (
     "ATTEST is an end-to-end agent testing framework that standardizes how agents are "
     "validated before and after release.\n"
     "34 deterministic assertions verify tool calls, JSON, routing, content, PII, cost & performance\n"
-    "36 LLM-based evaluators across 4 backends (built-in, DeepEval, Azure AI & RAGAS) score quality, safety & groundedness\n"
+    "37 evaluators across 4 backends (built-in, DeepEval, Azure AI & Content Safety, RAGAS) score quality, safety & groundedness\n"
     "Multi-turn conversations, user simulation & security red-teaming (30 attacks) stress-test agents\n"
     "Golden baselines detect regressions; web dashboard + CLI + CI deliver repeatable quality gates"
 )
@@ -90,14 +90,14 @@ BUSINESS_VALUE = (
 
 KEY_TECH = (
     "Deterministic Assertion Engine \u2013 34 checks for tool calls, JSON, routing, content, PII, cost & performance\n"
-    "LLM Evaluator Suite \u2013 36 evaluators across 4 backends: built-in, DeepEval, Azure AI Evaluation & RAGAS\n"
+    "LLM Evaluator Suite \u2013 37 evaluators across 4 backends: built-in, DeepEval, Azure AI Evaluation & RAGAS\n"
     "9 Pluggable Adapters \u2013 Foundry, HTTP REST, Callable, LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants & MCP (plus offline mock)\n"
     "Multi-turn, user simulation, security red-teaming (30 attacks) & multi-agent routing assertions\n"
     "Baseline / golden regression + Enterprise Auth (5-tier) + FastAPI dashboard + Typer CLI + CI/CD integration"
 )
 
 STATE = (
-    "Core framework, 34 assertions, 36 evaluators (4 backends), 9 adapters, security red-teaming, baselines & 9-page dashboard are built and working\n"
+    "Core framework, 34 assertions, 37 evaluators (4 backends), 9 adapters, security red-teaming, baselines & 9-page dashboard are built and working\n"
     "Next Steps\n"
     "Pilot on real production agents\n"
     "Broaden multi-agent / A2A & MCP scenario coverage\n"
@@ -310,13 +310,13 @@ def build_attest_diagram(slide, L, T, W, H):
     b_l = Emu(int(L + 0.01 * W))
     c_l = Emu(int(L + W - 0.01 * W - b_w))
     add_box(slide, b_l, b_t, b_w, b_h,
-            "Assertion Engine (32)",
+            "Assertion Engine (34)",
             ["Tool Calls", "JSON Schema", "Routing & Handoff",
              "Content · PII · Cost", "Performance", "Baseline / Golden"],
             title_size=11, body_size=8)
     add_box(slide, c_l, b_t, b_w, b_h,
-            "LLM Evaluators (36)",
-            ["Built-in (5)", "DeepEval (12)", "Azure AI (15)",
+            "LLM Evaluators (37)",
+            ["Built-in (5)", "DeepEval (12)", "Azure AI (16)",
              "RAGAS (4)", "Safety & Bias", "Groundedness"],
             title_size=11, body_size=8)
 

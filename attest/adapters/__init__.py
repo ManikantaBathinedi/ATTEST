@@ -66,8 +66,25 @@ def create_adapter(config: AgentConfig) -> BaseAgentAdapter:
             api_key=config.auth.key if config.auth.key else None,
         )
 
-    # Foundry Hosted Agent — HTTP endpoint
-    if adapter_type in ("foundry_hosted", "foundry_workflow"):
+    # Foundry Hosted (container) Agent — per-agent REST endpoint
+    if adapter_type in ("foundry_hosted", "foundry_container"):
+        from attest.adapters.foundry.hosted_agent import FoundryHostedAgentAdapter
+
+        if not config.endpoint:
+            raise ConfigError(
+                "Foundry hosted agent requires 'endpoint' (project endpoint URL)"
+            )
+        if not config.agent_name:
+            raise ConfigError("Foundry hosted agent requires 'agent_name'")
+
+        return FoundryHostedAgentAdapter(
+            endpoint=config.endpoint,
+            agent_name=config.agent_name,
+            api_key=config.auth.key if config.auth.key else None,
+        )
+
+    # Foundry workflow — generic HTTP endpoint
+    if adapter_type == "foundry_workflow":
         return HttpAgentAdapter(config)
 
     if adapter_type == "callable":
